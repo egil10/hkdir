@@ -257,6 +257,7 @@ kbd {
   gap: 16px;
   margin-bottom: 28px;
 }
+.kpi-grid-3 { grid-template-columns: repeat(3, 1fr); }
 .kpi {
   position: relative;
   background: var(--panel);
@@ -339,6 +340,11 @@ kbd {
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 3px;
+  flex-shrink: 0;
+}
+.seg-row {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 16px;
 }
 .seg-btn {
   appearance: none; border: 0; background: transparent;
@@ -479,6 +485,10 @@ kbd {
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
 }
+.study-card .card-top {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; margin-bottom: 8px;
+}
 .study-card .tag {
   display: inline-block;
   font-size: 11px;
@@ -486,8 +496,18 @@ kbd {
   color: var(--ink-2);
   padding: 2px 8px;
   border-radius: 999px;
-  margin-bottom: 8px;
 }
+.pg-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11.5px; font-weight: 600;
+  color: var(--primary-ink);
+  background: rgba(196,80,43,0.08);
+  border: 1px solid rgba(196,80,43,0.18);
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-family: "Fraunces", serif;
+}
+.pg-pill i { width: 12px; height: 12px; color: var(--primary); }
 .study-card .name {
   font-weight: 600;
   font-size: 15px;
@@ -681,6 +701,18 @@ kbd {
 .drawer-chart { padding: 16px 22px 0; height: 260px; }
 #d-chart { height: 100%; }
 .drawer-actions { padding: 16px 22px; display: flex; gap: 10px; }
+.drawer-section { padding: 4px 22px 0; }
+.drawer-section-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 6px;
+}
+.drawer-section-head h4 {
+  margin: 0; font-family: "Fraunces", serif; font-weight: 600; font-size: 16px;
+  display: inline-flex; align-items: center; gap: 8px; color: var(--ink);
+}
+.drawer-section-head h4 i { width: 16px; height: 16px; color: var(--primary); }
+#d-pg-chart { height: 240px; }
+
 .drawer-table { padding: 0 22px 22px; }
 .drawer-table table {
   width: 100%;
@@ -757,15 +789,19 @@ kbd {
   align-items: center;
 }
 .foot-title { font-weight: 600; margin-bottom: 4px; }
+.foot-links { display: flex; flex-wrap: wrap; gap: 8px; }
 .foot-link {
-  display: inline-flex; align-items: center; gap: 7px;
+  display: inline-flex; align-items: center; gap: 8px;
   color: var(--ink-2); text-decoration: none;
   font-size: 13px; font-weight: 500;
-  padding: 8px 14px; border: 1px solid var(--line);
+  padding: 8px 14px 8px 10px;
+  border: 1px solid var(--line);
   background: var(--panel); border-radius: 999px;
+  transition: border-color 160ms ease, color 160ms ease;
 }
 .foot-link:hover { color: var(--primary); border-color: var(--primary); }
-.foot-link i { width: 14px; height: 14px; }
+.foot-link i { width: 13px; height: 13px; opacity: .7; }
+.foot-link img { height: 18px; width: auto; display: block; border-radius: 3px; }
 
 /* ---------- Sector toggle (extra topbar element) ---------- */
 .sector-toggle {

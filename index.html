@@ -36,6 +36,7 @@
         <button class="tab" data-view="compare" role="tab"><i data-lucide="git-compare"></i><span>Sammenlign</span></button>
         <button class="tab" data-view="institutions" role="tab"><i data-lucide="landmark"></i><span>Institusjoner</span></button>
         <button class="tab" data-view="fields" role="tab"><i data-lucide="layers"></i><span>Fagområder</span></button>
+        <button class="tab" data-view="poeng" role="tab"><i data-lucide="medal"></i><span>Poenggrenser</span></button>
       </nav>
 
       <div class="topbar-actions">
@@ -44,7 +45,7 @@
           <span>2026</span>
           <i data-lucide="chevron-down"></i>
         </button>
-        <a class="ghost-btn" href="https://hkdir.no/sokertall-fra-samordna-opptak-til-nedlasting#Universitet%20og%20h%C3%B8gskoler" target="_blank" rel="noopener">
+        <a class="ghost-btn" href="https://hkdir.no/sokertall-fra-samordna-opptak-til-nedlasting#Universitet%20og%20h%C3%B8gskoler" target="_blank" rel="noopener" title="HK-dir — søkertall">
           <i data-lucide="external-link"></i><span>Kilde</span>
         </a>
       </div>
@@ -192,6 +193,8 @@
               <option value="kv-asc">Lavest kvinneandel</option>
               <option value="growth-desc">Størst vekst (2021→2026)</option>
               <option value="growth-asc">Størst nedgang (2021→2026)</option>
+              <option value="pg-desc">Høyest poenggrense</option>
+              <option value="pg-asc">Lavest poenggrense</option>
               <option value="name-asc">Navn A–Å</option>
             </select>
           </div>
@@ -263,6 +266,83 @@
       <div id="inst-grid" class="inst-grid"></div>
     </section>
 
+    <!-- POENGGRENSER -->
+    <section id="view-poeng" class="view">
+      <div class="section-head">
+        <div>
+          <h2>Poenggrenser</h2>
+          <p class="muted">Lavest poengsum som ga tilbud — per studieprogram, kvote og opptaksrunde. 2020–2025. <span class="muted small">Kun universitet og høgskole.</span></p>
+        </div>
+        <div class="seg" data-group="pg-controls">
+          <button class="seg-btn active" data-round="hov">Hovedopptak</button>
+          <button class="seg-btn" data-round="sup">Suppleringsopptak</button>
+        </div>
+      </div>
+      <div class="seg-row">
+        <div class="seg" data-group="pg-quota">
+          <button class="seg-btn active" data-quota="ord">Ordinær kvote</button>
+          <button class="seg-btn" data-quota="fgv">Førstegangsvitnemål</button>
+        </div>
+        <div class="seg" data-group="pg-year">
+          <button class="seg-btn" data-year="2020">2020</button>
+          <button class="seg-btn" data-year="2021">2021</button>
+          <button class="seg-btn" data-year="2022">2022</button>
+          <button class="seg-btn" data-year="2023">2023</button>
+          <button class="seg-btn" data-year="2024">2024</button>
+          <button class="seg-btn active" data-year="2025">2025</button>
+        </div>
+      </div>
+
+      <div class="kpi-grid kpi-grid-3">
+        <article class="kpi" data-accent="primary">
+          <div class="kpi-top"><i data-lucide="medal"></i><span>Median poenggrense</span></div>
+          <div class="kpi-value" id="pg-kpi-median">—</div>
+          <div class="kpi-delta" id="pg-kpi-median-delta"></div>
+        </article>
+        <article class="kpi" data-accent="teal">
+          <div class="kpi-top"><i data-lucide="shield-check"></i><span>Studier med poenggrense</span></div>
+          <div class="kpi-value" id="pg-kpi-count">—</div>
+          <div class="kpi-delta muted" id="pg-kpi-count-note"></div>
+        </article>
+        <article class="kpi" data-accent="gold">
+          <div class="kpi-top"><i data-lucide="door-open"></i><span>Åpne (alle kom inn)</span></div>
+          <div class="kpi-value" id="pg-kpi-open">—</div>
+          <div class="kpi-delta muted" id="pg-kpi-open-note"></div>
+        </article>
+      </div>
+
+      <div class="grid-2">
+        <section class="card">
+          <header class="card-header">
+            <div>
+              <h2>Vanskeligst å komme inn på</h2>
+              <p class="muted">Topp 10 i <span id="pg-top-year">2025</span></p>
+            </div>
+          </header>
+          <div id="pg-top-hard" class="top-list"></div>
+        </section>
+        <section class="card">
+          <header class="card-header">
+            <div>
+              <h2>Størst endring siden 2020</h2>
+              <p class="muted">Topp stigninger og fall i poenggrense</p>
+            </div>
+          </header>
+          <div id="pg-top-change" class="top-list"></div>
+        </section>
+      </div>
+
+      <section class="card">
+        <header class="card-header">
+          <div>
+            <h2>Poenggrenser per fagområde</h2>
+            <p class="muted">Median poenggrense over tid — linjer per fagområde.</p>
+          </div>
+        </header>
+        <div id="chart-pg-fields" class="chart chart-heat"></div>
+      </section>
+    </section>
+
     <!-- FIELDS -->
     <section id="view-fields" class="view">
       <div class="section-head">
@@ -295,6 +375,16 @@
       <div class="drawer-actions">
         <button id="d-add-compare" class="primary-btn"><i data-lucide="git-compare"></i>Legg til sammenligning</button>
       </div>
+      <div class="drawer-section" id="d-pg-section" hidden>
+        <div class="drawer-section-head">
+          <h4><i data-lucide="medal"></i>Poenggrenser 2020–2025</h4>
+          <div class="seg" data-group="d-pg-round">
+            <button class="seg-btn active" data-round="hov">Hovedopptak</button>
+            <button class="seg-btn" data-round="sup">Suppleringsopptak</button>
+          </div>
+        </div>
+        <div class="drawer-chart" id="d-pg-chart"></div>
+      </div>
       <div class="drawer-table" id="d-table"></div>
     </div>
   </aside>
@@ -305,9 +395,18 @@
         <div class="foot-title">HK-dir Grunndata · Søkertall</div>
         <div class="muted small">Data fra Samordna opptak publisert av Direktoratet for høyere utdanning og kompetanse. Visualisert for utforskning — ikke en offisiell HK-dir-tjeneste.</div>
       </div>
-      <a href="https://hkdir.no/sokertall-fra-samordna-opptak-til-nedlasting#Universitet%20og%20h%C3%B8gskoler" target="_blank" rel="noopener" class="foot-link">
-        <i data-lucide="external-link"></i><span>hkdir.no — last ned grunndata</span>
-      </a>
+      <div class="foot-links">
+        <a href="https://hkdir.no/sokertall-fra-samordna-opptak-til-nedlasting#Universitet%20og%20h%C3%B8gskoler" target="_blank" rel="noopener" class="foot-link">
+          <img src="assets/baeb68e1-87a6-4fe6-ab2b-a603ade0f355-w_300_h_100.png" alt="HK-dir" />
+          <span>HK-dir — søkertall</span>
+          <i data-lucide="external-link"></i>
+        </a>
+        <a href="https://www.samordnaopptak.no/universitet-og-hogskole/poengberegning/poenggrenser.html" target="_blank" rel="noopener" class="foot-link">
+          <img src="assets/samordna.png" alt="Samordna opptak" />
+          <span>Samordna opptak — poenggrenser</span>
+          <i data-lucide="external-link"></i>
+        </a>
+      </div>
     </div>
   </footer>
 

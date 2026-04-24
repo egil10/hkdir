@@ -44,6 +44,15 @@ const state = {
   listLimit: 60,
   compare: [],
   charts: {},
+  pg: { round: "hov", quota: "ord", year: 2025, drawerRound: "hov" },
+};
+
+const PG_YEARS = [2020, 2021, 2022, 2023, 2024, 2025];
+const PG_SERIES_META = {
+  hov_ord: { label: "Hovedopptak · ordinær",        color: "#c4502b", dash: false },
+  hov_fgv: { label: "Hovedopptak · førstegangsvit.", color: "#e0a34a", dash: false },
+  sup_ord: { label: "Suppleringsopptak · ordinær",   color: "#2d6d7a", dash: true },
+  sup_fgv: { label: "Suppleringsopptak · førstegang.",color: "#4a7c59", dash: true },
 };
 
 const els = {};
@@ -73,7 +82,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const applyHash = () => {
     const h = (location.hash || "").replace(/^#/, "");
-    if (["overview", "explore", "compare", "institutions", "fields"].includes(h)) setTab(h);
+    if (["overview", "explore", "compare", "institutions", "fields", "poeng"].includes(h)) setTab(h);
   };
   applyHash();
   window.addEventListener("hashchange", applyHash);
@@ -231,6 +240,7 @@ function setTab(name) {
   if (name === "institutions") renderInstitutions();
   if (name === "fields") renderFields();
   if (name === "compare") { renderCompareChips(); renderCompareCharts(); }
+  if (name === "poeng") renderPoengView();
   // Resize after the view is visible so ECharts picks up real dimensions
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
@@ -247,6 +257,13 @@ function setSector(sector) {
   state.filters = { inst: -1, field: -1, loc: -1 };
   state.compare = [];
   syncSectorYear();
+  // Poenggrenser tab: disabled for fagskoler (Samordna publiserer ikke disse)
+  const pgTab = document.querySelector('.tab[data-view="poeng"]');
+  if (pgTab) {
+    pgTab.style.opacity = sector === "fag" ? 0.45 : 1;
+    pgTab.title = sector === "fag" ? "Samordna opptak publiserer ikke poenggrenser for fagskoler" : "";
+    if (sector === "fag" && state.tab === "poeng") setTab("overview");
+  }
   renderAll();
   showToast(`Skiftet til ${state.data.meta.sectors[sector]}`);
 }
@@ -602,6 +619,12 @@ function filterStudies() {
         const a0 = x.fv[0], a1 = x.fv[Y-1];
         return (a0 > 0 && a1 != null) ? ((a1 - a0) / a0) * 100 : -Infinity;
       }
+      if (metric === "pg") {
+        if (!x.pg) return dir === 1 ? Infinity : -Infinity;  // push nulls to end
+        const arr = x.pg.hov_ord || [];
+        for (let j = arr.length - 1; j >= 0; j--) if (arr[j] != null && arr[j] > 0) return arr[j];
+        return dir === 1 ? Infinity : -Infinity;
+      }
       return 0;
     };
     const av = getval(a), bv = getval(b);
@@ -637,12 +660,26 @@ function renderStudyList() {
   renderIcons();
 }
 
+function latestPg(x) {
+  if (!x.pg) return null;
+  const arr = x.pg.hov_ord || [];
+  for (let i = arr.length - 1; i >= 0; i--) if (arr[i] != null && arr[i] > 0) return { v: arr[i], y: PG_YEARS[i] };
+  return null;
+}
+
 function studyCardHTML(x, s, i) {
   const fv = x.fv[i], sAll = x.s[i], p = x.p[i], kv = x.kv[i];
   const ratio = (p > 0 && fv != null) ? fv / p : null;
+  const pg = latestPg(x);
+  const pgPill = pg
+    ? `<span class="pg-pill" title="Poenggrense ordinær hovedopptak ${pg.y}"><i data-lucide="medal"></i>${pg.v.toFixed(1).replace(".", ",")}</span>`
+    : "";
   return `
     <article class="study-card" data-code="${x.c}" data-inst="${x.i}">
-      <div class="tag">${escapeHtml(s.fields[x.f])}</div>
+      <div class="card-top">
+        <div class="tag">${escapeHtml(s.fields[x.f])}</div>
+        ${pgPill}
+      </div>
       <div class="name">${escapeHtml(x.n)}</div>
       <div class="sub"><i data-lucide="landmark"></i>${escapeHtml(s.institutions[x.i])} · <i data-lucide="map-pin"></i>${escapeHtml(s.locations[x.l])}</div>
       <div class="stats">
@@ -738,10 +775,19 @@ function openDrawer(study) {
   // table
   els["d-table"].innerHTML = renderStudyTable(study, s);
 
+  // poenggrenser section
+  const pgSection = document.getElementById("d-pg-section");
+  if (study.pg) {
+    pgSection.hidden = false;
+    renderDrawerPgChart(study);
+  } else {
+    pgSection.hidden = true;
+  }
+
   els["d-add-compare"].onclick = () => { addToCompare(study); showToast("Lagt til i sammenligning"); };
   els["drawer"].setAttribute("aria-hidden", "false");
   renderIcons();
-  setTimeout(() => ch.resize(), 280);
+  setTimeout(() => { ch.resize(); if (study.pg && state.charts["d-pg-chart"]) state.charts["d-pg-chart"].resize(); }, 280);
 }
 
 function renderStudyTable(study, s) {
@@ -936,6 +982,216 @@ function renderFields() {
       els["search"].value = ""; state.search = "";
       renderStudyList();
     });
+  });
+}
+
+/* ---------- Poenggrenser view ---------- */
+function wirePoengControls() {
+  if (wirePoengControls._done) return;
+  wirePoengControls._done = true;
+  document.querySelectorAll('.seg[data-group="pg-controls"] .seg-btn').forEach(b => {
+    b.addEventListener("click", () => { setSegActive(b); state.pg.round = b.dataset.round; renderPoengView(); });
+  });
+  document.querySelectorAll('.seg[data-group="pg-quota"] .seg-btn').forEach(b => {
+    b.addEventListener("click", () => { setSegActive(b); state.pg.quota = b.dataset.quota; renderPoengView(); });
+  });
+  document.querySelectorAll('.seg[data-group="pg-year"] .seg-btn').forEach(b => {
+    b.addEventListener("click", () => { setSegActive(b); state.pg.year = +b.dataset.year; renderPoengView(); });
+  });
+  document.querySelectorAll('.seg[data-group="d-pg-round"] .seg-btn').forEach(b => {
+    b.addEventListener("click", () => { setSegActive(b); state.pg.drawerRound = b.dataset.round; /* need current study — find from drawer dom */
+      const code = document.getElementById("d-code").textContent.trim();
+      const instName = document.getElementById("d-inst").textContent.trim();
+      const s = state.data.sectors[state.sector];
+      const iIdx = s.institutions.indexOf(instName);
+      const study = findStudy(code, iIdx);
+      if (study) renderDrawerPgChart(study);
+    });
+  });
+}
+
+function pgValueFor(study, round, quota, yearIdx) {
+  if (!study.pg) return null;
+  const arr = study.pg[`${round}_${quota}`];
+  return arr ? arr[yearIdx] : null;
+}
+
+function renderPoengView() {
+  wirePoengControls();
+  const s = state.data.sectors[state.sector];
+  if (state.sector !== "uh") {
+    document.getElementById("view-poeng").innerHTML = `
+      <section class="card">
+        <h2>Ingen poenggrensedata for fagskoler</h2>
+        <p class="muted">Samordna opptak publiserer ikke poenggrenser for fagskoler. Bytt til Universitet &amp; høgskole.</p>
+      </section>`;
+    return;
+  }
+  document.getElementById("pg-top-year").textContent = state.pg.year;
+
+  const { round, quota, year } = state.pg;
+  const yearIdx = PG_YEARS.indexOf(year);
+  const studiesWithPg = s.studies.filter(x => x.pg);
+  const valid = studiesWithPg
+    .map(x => ({ x, v: pgValueFor(x, round, quota, yearIdx) }))
+    .filter(r => r.v != null);
+
+  // KPI 1: median among programs where someone didn't get in (pg > 0)
+  const withCutoff = valid.filter(r => r.v > 0).map(r => r.v).sort((a, b) => a - b);
+  const median = withCutoff.length ? withCutoff[Math.floor(withCutoff.length / 2)] : null;
+  document.getElementById("pg-kpi-median").textContent = median != null ? median.toFixed(1).replace(".", ",") : "—";
+
+  // delta vs previous year
+  const prevIdx = yearIdx - 1;
+  let prevMedian = null;
+  if (prevIdx >= 0) {
+    const pv = studiesWithPg.map(x => pgValueFor(x, round, quota, prevIdx)).filter(v => v != null && v > 0).sort((a, b) => a - b);
+    if (pv.length) prevMedian = pv[Math.floor(pv.length / 2)];
+  }
+  const mDeltaEl = document.getElementById("pg-kpi-median-delta");
+  if (median != null && prevMedian != null) {
+    const d = median - prevMedian;
+    mDeltaEl.innerHTML = `<i data-lucide="${d > 0 ? "trending-up" : d < 0 ? "trending-down" : "minus"}"></i> ${d > 0 ? "+" : ""}${d.toFixed(1).replace(".", ",")} poeng vs ${year - 1}`;
+    mDeltaEl.className = "kpi-delta " + (d > 0 ? "up" : d < 0 ? "down" : "");
+  } else {
+    mDeltaEl.innerHTML = ""; mDeltaEl.className = "kpi-delta";
+  }
+
+  // KPI 2: count with pg data
+  document.getElementById("pg-kpi-count").textContent = FMT.int(valid.length);
+  document.getElementById("pg-kpi-count-note").textContent = `av ${FMT.int(studiesWithPg.length)} programmer`;
+
+  // KPI 3: open programs (pg = 0)
+  const open = valid.filter(r => r.v === 0).length;
+  document.getElementById("pg-kpi-open").textContent = FMT.int(open);
+  document.getElementById("pg-kpi-open-note").textContent = `${valid.length ? ((open / valid.length) * 100).toFixed(0) : 0} % av disse`;
+
+  // Top 10 hardest
+  const top = valid
+    .filter(r => r.v > 0)
+    .sort((a, b) => b.v - a.v)
+    .slice(0, 10);
+  document.getElementById("pg-top-hard").innerHTML = top.map((r, i) => `
+    <div class="top-row" data-code="${r.x.c}" data-inst="${r.x.i}">
+      <div class="rank">${i + 1}</div>
+      <div>
+        <div class="title">${escapeHtml(r.x.n)}</div>
+        <div class="sub">${escapeHtml(s.institutions[r.x.i])} · ${escapeHtml(s.locations[r.x.l])}</div>
+      </div>
+      <div class="value">${r.v.toFixed(1).replace(".", ",")}</div>
+    </div>
+  `).join("") || `<div class="muted small" style="padding:16px">Ingen data.</div>`;
+  document.querySelectorAll("#pg-top-hard .top-row").forEach(el => {
+    el.addEventListener("click", () => openDrawer(findStudy(el.dataset.code, +el.dataset.inst)));
+  });
+
+  // Top change: sort by abs change 2020 -> 2025 (or first->last valid)
+  const changes = studiesWithPg
+    .map(x => {
+      const arr = x.pg[`${round}_${quota}`] || [];
+      const firstValid = arr.findIndex(v => v != null && v > 0);
+      let lastValid = -1;
+      for (let i = arr.length - 1; i >= 0; i--) if (arr[i] != null && arr[i] > 0) { lastValid = i; break; }
+      if (firstValid < 0 || lastValid < 0 || firstValid === lastValid) return null;
+      return { x, from: arr[firstValid], to: arr[lastValid], fromYr: PG_YEARS[firstValid], toYr: PG_YEARS[lastValid] };
+    })
+    .filter(Boolean);
+  changes.forEach(c => c.delta = c.to - c.from);
+  const top5Up = [...changes].sort((a, b) => b.delta - a.delta).slice(0, 5);
+  const top5Dn = [...changes].sort((a, b) => a.delta - b.delta).slice(0, 5);
+  const both = [...top5Up, ...top5Dn];
+  document.getElementById("pg-top-change").innerHTML = both.map((c, i) => `
+    <div class="top-row" data-code="${c.x.c}" data-inst="${c.x.i}">
+      <div class="rank" style="color:${c.delta > 0 ? COLORS.teal : COLORS.primary}">${c.delta > 0 ? "↑" : "↓"}</div>
+      <div>
+        <div class="title">${escapeHtml(c.x.n)}</div>
+        <div class="sub">${escapeHtml(s.institutions[c.x.i])} · ${c.fromYr}: ${c.from.toFixed(1).replace(".", ",")} → ${c.toYr}: ${c.to.toFixed(1).replace(".", ",")}</div>
+      </div>
+      <div class="value" style="color:${c.delta > 0 ? COLORS.teal : COLORS.primary}">${c.delta > 0 ? "+" : ""}${c.delta.toFixed(1).replace(".", ",")}</div>
+    </div>
+  `).join("") || `<div class="muted small" style="padding:16px">Ingen data.</div>`;
+  document.querySelectorAll("#pg-top-change .top-row").forEach(el => {
+    el.addEventListener("click", () => openDrawer(findStudy(el.dataset.code, +el.dataset.inst)));
+  });
+
+  // Chart: median poenggrense per field over years
+  renderPoengFieldsChart(s);
+
+  renderIcons();
+}
+
+function renderPoengFieldsChart(s) {
+  const { round, quota } = state.pg;
+  const chart = makeChart("chart-pg-fields");
+  if (!chart) return;
+
+  // Build median per field per year
+  const byField = new Map();
+  for (const x of s.studies) {
+    if (!x.pg) continue;
+    const arr = x.pg[`${round}_${quota}`];
+    if (!arr) continue;
+    for (let i = 0; i < PG_YEARS.length; i++) {
+      if (arr[i] == null || arr[i] <= 0) continue;
+      if (!byField.has(x.f)) byField.set(x.f, PG_YEARS.map(() => []));
+      byField.get(x.f)[i].push(arr[i]);
+    }
+  }
+  const medianOf = (arr) => {
+    if (!arr.length) return null;
+    const sorted = [...arr].sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length / 2)];
+  };
+  // Keep only top 12 fields by total studies
+  const fieldSizes = s.fields.map((_, i) => ({ i, c: s.studies.filter(x => x.f === i && x.pg).length }));
+  fieldSizes.sort((a, b) => b.c - a.c);
+  const keep = fieldSizes.slice(0, 14).map(x => x.i);
+
+  const series = keep.map((fIdx, i) => ({
+    name: s.fields[fIdx],
+    type: "line",
+    smooth: true,
+    symbolSize: 5,
+    lineStyle: { width: 2 },
+    color: SERIES_COLORS[i % SERIES_COLORS.length],
+    data: (byField.get(fIdx) || PG_YEARS.map(() => [])).map(medianOf),
+  }));
+
+  chart.setOption({
+    grid: { top: 50, left: 48, right: 20, bottom: 24 },
+    legend: { top: 0, type: "scroll", icon: "circle", itemWidth: 8, itemHeight: 8, textStyle: { color: COLORS.ink2, fontSize: 11.5 } },
+    tooltip: { ...baseTooltip, trigger: "axis", valueFormatter: v => v == null ? "—" : v.toFixed(1).replace(".", ",") },
+    xAxis: { type: "category", data: PG_YEARS, ...baseAxis },
+    yAxis: { type: "value", ...baseAxis, axisLabel: { ...baseAxis.axisLabel, formatter: v => v.toFixed(0) } },
+    series,
+  });
+}
+
+function renderDrawerPgChart(study) {
+  const chart = makeChart("d-pg-chart");
+  if (!chart) return;
+  const round = state.pg.drawerRound;
+  const series = ["ord", "fgv"].map(quota => {
+    const key = `${round}_${quota}`;
+    const meta = PG_SERIES_META[key];
+    return {
+      name: meta.label,
+      type: "line",
+      smooth: true,
+      symbolSize: 6,
+      lineStyle: { width: 2.5, type: meta.dash ? "dashed" : "solid" },
+      color: meta.color,
+      data: (study.pg[key] || []).map(v => v == null ? null : v),
+      connectNulls: true,
+    };
+  });
+  chart.setOption({
+    grid: { top: 34, left: 44, right: 16, bottom: 28 },
+    legend: { top: 0, icon: "circle", itemWidth: 8, itemHeight: 8, textStyle: { color: COLORS.ink2, fontSize: 11.5 } },
+    tooltip: { ...baseTooltip, trigger: "axis", valueFormatter: v => v == null ? "—" : v.toFixed(1).replace(".", ",") + " poeng" },
+    xAxis: { type: "category", data: PG_YEARS, ...baseAxis },
+    yAxis: { type: "value", ...baseAxis, axisLabel: { ...baseAxis.axisLabel, formatter: v => v.toFixed(0) } },
+    series,
   });
 }
 

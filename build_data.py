@@ -7,9 +7,11 @@ Input files (in data/):
   nokkeltall-programniva-fag.xlsx          Program level, fagskoler
   nokkeltall-institusjonsniva-fag.xlsx     Institution level, fagskoler
   nokkeltall-utdanningsomradeniva-fag.xlsx Field level, fagskoler
+  poenggrenser/pg-YYYY.csv                 Poenggrenser per år (2020–2025, UH only)
 
 Output: data/grunndata.json
 """
+import csv
 import json
 from pathlib import Path
 
@@ -186,11 +188,70 @@ def build_sector(program_path, inst_path, field_path):
     }
 
 
+PG_YEARS = list(range(2020, 2026))
+PG_DIR = DATA / "poenggrenser"
+QUOTA_KEY = {"Ordinær kvote": "ord", "Førstegangsvitnemålskvote": "fgv"}
+ROUND_KEY = {"Hovedopptak": "hov", "Suppleringsopptak": "sup"}
+
+
+def parse_pg(v):
+    if v is None or v == "":
+        return None
+    s = str(v).replace(",", ".").replace(" ", "").strip()
+    if not s:
+        return None
+    try:
+        return round(float(s), 1)
+    except ValueError:
+        return None
+
+
+def load_poenggrenser():
+    """Return {normalized_studiekode: {series_key: [pg per year]}}."""
+    out = {}
+    series_keys = [f"{r}_{q}" for r in ROUND_KEY.values() for q in QUOTA_KEY.values()]
+
+    def empty():
+        return {k: [None] * len(PG_YEARS) for k in series_keys}
+
+    for year_idx, year in enumerate(PG_YEARS):
+        path = PG_DIR / f"pg-{year}.csv"
+        if not path.exists():
+            continue
+        with path.open(encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f, delimiter=";")
+            for r in reader:
+                code = r["Studiekode"].replace(" ", "").replace("\xa0", "")
+                if not code:
+                    continue
+                qk = QUOTA_KEY.get(r["Kvote"])
+                rk = ROUND_KEY.get(r["Opptaksrunde"])
+                if not qk or not rk:
+                    continue
+                bucket = out.setdefault(code, empty())
+                bucket[f"{rk}_{qk}"][year_idx] = parse_pg(r["Poenggrense"])
+    return out
+
+
+def attach_poenggrenser(sector_data, pg_map):
+    attached = 0
+    for study in sector_data["studies"]:
+        data = pg_map.get(study["c"])
+        if data:
+            study["pg"] = data
+            attached += 1
+    sector_data["pgYears"] = PG_YEARS
+    sector_data["pgAttached"] = attached
+    return attached
+
+
 def main():
     out = {
         "meta": {
             "source": "HK-dir — Søkertall fra Samordna opptak",
             "url": "https://hkdir.no/sokertall-fra-samordna-opptak-til-nedlasting#Universitet%20og%20h%C3%B8gskoler",
+            "poenggrenserSource": "Samordna opptak / SO-datavarehus (Tableau)",
+            "poenggrenserUrl": "https://rapport-dv.educloud.no/t/SO-datavarehus/views/Poenggrenserogventelistetallhovedopptaksuppleringsopptak_16275618215770/Poenggrenser",
             "sectors": {
                 "uh": "Universitet og høgskoler",
                 "fag": "Fagskoler",
@@ -201,17 +262,21 @@ def main():
     for sector, paths in FILES.items():
         out["sectors"][sector] = build_sector(paths["program"], paths["institution"], paths["field"])
 
+    pg_map = load_poenggrenser()
+    attached = attach_poenggrenser(out["sectors"]["uh"], pg_map)
+
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
     total_studies = sum(len(s["studies"]) for s in out["sectors"].values())
     print(f"Wrote {OUT}  ({OUT.stat().st_size/1024:.1f} KB, {total_studies} studies)")
     for sector, s in out["sectors"].items():
+        pg_info = f", poenggrenser: {s.get('pgAttached', 0)}" if sector == "uh" else ""
         print(
             f"  {sector}: {len(s['studies'])} studies, "
             f"{len(s['institutions'])} institusjoner, "
             f"{len(s['locations'])} steder, "
-            f"{len(s['fields'])} fagområder"
+            f"{len(s['fields'])} fagområder{pg_info}"
         )
 
 
