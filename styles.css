@@ -880,6 +880,34 @@ kbd {
 .menu .sep { height: 1px; background: var(--line); margin: 4px 0; }
 .menu .label { padding: 4px 12px; font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.04em; }
 
+/* ---------- Loader ---------- */
+.loader {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: rgba(196, 80, 43, 0.08);
+  overflow: hidden;
+  z-index: 80;
+  opacity: 0;
+  transition: opacity 220ms ease 120ms;
+  pointer-events: none;
+}
+.is-loading .loader { opacity: 1; transition-delay: 0ms; }
+.loader span {
+  display: block; height: 100%;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, var(--primary) 30%, var(--gold) 60%, var(--primary) 85%, transparent);
+  animation: loader-slide 1.2s cubic-bezier(0.4, 0.0, 0.2, 1) infinite;
+  border-radius: 999px;
+}
+@keyframes loader-slide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+
+.is-loading main.shell { opacity: 0.35; transition: opacity 200ms ease; }
+main.shell { opacity: 1; transition: opacity 320ms ease; }
+
 /* ---------- Toast ---------- */
 .toast {
   position: fixed;

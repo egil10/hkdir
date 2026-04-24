@@ -94,6 +94,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
   applyHash();
   window.addEventListener("hashchange", applyHash);
+
+  // Fade the loader out once the first paint is settled
+  requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.remove("is-loading")));
 });
 
 function cacheEls() {
@@ -134,14 +137,15 @@ function syncSectorYear() {
 }
 
 function wireStatic() {
-  // Brand logo → reset to overview + scroll top (without full page reload)
+  // Brand logo → hard refresh (cache-busted) back to the overview landing state.
   const brand = document.getElementById("brand-home");
   if (brand) {
     brand.addEventListener("click", (e) => {
       e.preventDefault();
-      setTab("overview");
-      history.replaceState(null, "", location.pathname + location.search);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      document.body.classList.add("is-loading");
+      // Cache-bust the main doc so reloading picks up any new deploy.
+      const url = location.pathname + "?_r=" + Date.now();
+      location.replace(url);
     });
   }
 
@@ -978,90 +982,102 @@ function renderFields() {
   });
   agg.sort((a, b) => (b.fv[state.yearIdx] ?? 0) - (a.fv[state.yearIdx] ?? 0));
 
-  // Heatmap: rows = fields (sorted by current-year førstevalg, biggest first),
-  // cols = years, color = % change vs first year (diverging), label shows abs number.
+  // Heatmap: rows = fields, cols = years, colour = førstevalg-antall.
+  // Sequential warm scale; scaled to √(value) so mid-sized fields still get
+  // readable colour instead of being washed out by the biggest ones.
   const heatEl = document.getElementById("chart-fields-heat");
   if (heatEl) {
-    // Make height dynamic so each row is readable.
-    const rowH = 26;
+    const rowH = 28;
     heatEl.style.height = `${Math.max(360, agg.length * rowH + 110)}px`;
   }
   const chart = makeChart("chart-fields-heat");
   if (chart) {
-    // Top → bottom = biggest field first in the current year
     const ordered = [...agg].sort((a, b) => (b.fv[state.yearIdx] ?? 0) - (a.fv[state.yearIdx] ?? 0));
 
+    const allVals = [];
     const data = [];
-    let vMax = 0;
     ordered.forEach((a, row) => {
-      const base = a.fv[0];
-      s.years.forEach((y, col) => {
+      s.years.forEach((_, col) => {
         const val = a.fv[col];
-        let pct = null;
-        if (base && base > 0 && val != null) pct = ((val - base) / base) * 100;
-        if (pct != null) vMax = Math.max(vMax, Math.abs(pct));
-        data.push([col, row, pct == null ? null : +pct.toFixed(1), val]);
+        if (val != null) allVals.push(val);
+        const colorVal = val == null ? null : Math.sqrt(val);   // perceptual
+        data.push([col, row, colorVal, val]);
       });
     });
-    // Cap the scale at ±60 % so mid-range cells get distinct colour
-    const cap = Math.min(Math.max(vMax, 30), 60);
+    const maxColor = Math.max(...allVals.map(v => Math.sqrt(v))) || 1;
 
     chart.setOption({
       animation: false,
       tooltip: {
         ...baseTooltip,
         formatter: p => {
-          const [col, rowIdx, pct, abs] = p.value;
+          const [col, rowIdx, , abs] = p.value;
           const name = ordered[(ordered.length - 1) - rowIdx].name;
-          const deltaTxt = pct == null ? "—" : `${pct > 0 ? "+" : ""}${pct.toFixed(1).replace(".", ",")} %`;
-          return `<b>${escapeHtml(name)}</b><br/>${s.years[col]}: ${FMT.int(abs)} førstevalg<br/>Endring fra ${s.years[0]}: ${deltaTxt}`;
+          const base = ordered[(ordered.length - 1) - rowIdx].fv[0];
+          const pct = (base && base > 0 && abs != null) ? ((abs - base) / base) * 100 : null;
+          const deltaTxt = pct == null ? "" : `<br/>Endring fra ${s.years[0]}: ${pct > 0 ? "+" : ""}${pct.toFixed(1).replace(".", ",")} %`;
+          return `<b>${escapeHtml(name)}</b><br/>${s.years[col]}: ${FMT.int(abs)} førstevalg${deltaTxt}`;
         }
       },
-      grid: { top: 28, left: 260, right: 40, bottom: 56 },
+      grid: { top: 30, left: 260, right: 30, bottom: 20 },
       xAxis: {
         type: "category",
         data: s.years,
         position: "top",
         axisLine: { show: false }, axisTick: { show: false },
-        axisLabel: { color: COLORS.ink, fontSize: 12, fontWeight: 500 },
+        axisLabel: { color: COLORS.ink, fontSize: 12.5, fontWeight: 500 },
       },
       yAxis: {
         type: "category",
         data: ordered.map(a => a.name).reverse(),
         axisLine: { show: false }, axisTick: { show: false },
-        axisLabel: { color: COLORS.ink2, fontSize: 12 },
+        axisLabel: { color: COLORS.ink, fontSize: 12 },
       },
       visualMap: {
         show: true,
-        min: -cap, max: cap,
+        min: 0, max: maxColor,
         orient: "horizontal",
-        left: "center", bottom: 12,
-        itemWidth: 14, itemHeight: 180,
-        precision: 0,
-        text: [`+${cap.toFixed(0)} %`, `-${cap.toFixed(0)} %`],
+        left: "center", bottom: -6,
+        itemWidth: 12, itemHeight: 200,
+        text: ["mange", "få"],
         textStyle: { color: COLORS.muted, fontSize: 11 },
-        formatter: v => `${v > 0 ? "+" : ""}${v.toFixed(0)} %`,
+        formatter: v => FMT.int(v * v),   // invert sqrt for display
         inRange: {
-          // diverging: teal (decline) → warm white (no change) → terracotta (growth)
-          color: ["#1f5a66", "#5d98a3", "#b9d2d5", "#f2eadf", "#f4c5a3", "#de7a53", "#a63a1d"],
+          color: [
+            "#1d6e3c",   // deep green — few
+            "#3f9d55",
+            "#7ebb4a",
+            "#c6c23f",
+            "#eec14d",   // yellow middle
+            "#e39240",
+            "#d2632f",
+            "#b3391a",
+            "#7a1f0a",   // deep red — many
+          ],
         },
       },
       series: [{
         type: "heatmap",
-        data: data.map(([col, row, pct, abs]) => [col, (ordered.length - 1) - row, pct, abs]),
+        data: data.map(([col, row, c, abs]) => [col, (ordered.length - 1) - row, c, abs]),
         label: {
           show: true,
           formatter: p => p.value[3] == null ? "—" : FMT.int(p.value[3]),
           color: p => {
-            const pct = p.value[2];
-            if (pct == null) return COLORS.muted;
-            return Math.abs(pct) > cap * 0.55 ? "#fff" : "#1d2930";
+            const c = p.value[2];
+            if (c == null) return COLORS.muted;
+            const t = c / maxColor;
+            // Dark ends of the traffic-light ramp need white text;
+            // yellow/orange middle is bright enough for dark text.
+            return (t < 0.22 || t > 0.72) ? "#fff" : "#1d2930";
           },
-          fontSize: 11,
+          fontSize: 11.5,
           fontWeight: 500,
         },
         itemStyle: { borderColor: "#fbf7f1", borderWidth: 2, borderRadius: 4 },
-        emphasis: { itemStyle: { borderColor: COLORS.ink, borderWidth: 2 } },
+        emphasis: {
+          itemStyle: { borderColor: COLORS.ink, borderWidth: 2 },
+          label: { fontWeight: 700 },
+        },
       }],
     });
   }
