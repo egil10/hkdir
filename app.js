@@ -47,7 +47,15 @@ const state = {
   pg: { round: "hov", quota: "ord", year: 2025, drawerRound: "hov" },
   pages: { top: 0, pgHard: 0, pgChange: 0 },
   topMetric: "fv",
-  table: { search: "", sortKey: "fv", sortDir: -1, page: 0, perPage: 200 },
+  table: {
+    search: "",
+    sortKey: "fv",
+    sortDir: -1,
+    page: 0,
+    perPage: 200,
+    colFilters: {},      // {colKey: {text?: string, min?: number, max?: number}}
+    showFilters: true,
+  },
 };
 
 const PAGE_SIZE = 10;
@@ -994,17 +1002,19 @@ function renderFields() {
   if (chart) {
     const ordered = [...agg].sort((a, b) => (b.fv[state.yearIdx] ?? 0) - (a.fv[state.yearIdx] ?? 0));
 
+    // Log-scale the color dimension so huge and tiny fields both get readable hues.
     const allVals = [];
     const data = [];
     ordered.forEach((a, row) => {
       s.years.forEach((_, col) => {
         const val = a.fv[col];
-        if (val != null) allVals.push(val);
-        const colorVal = val == null ? null : Math.sqrt(val);   // perceptual
+        if (val != null && val > 0) allVals.push(val);
+        const colorVal = (val == null || val <= 0) ? null : Math.log10(val);
         data.push([col, row, colorVal, val]);
       });
     });
-    const maxColor = Math.max(...allVals.map(v => Math.sqrt(v))) || 1;
+    const logMin = allVals.length ? Math.log10(Math.min(...allVals)) : 0;
+    const logMax = allVals.length ? Math.log10(Math.max(...allVals)) : 1;
 
     chart.setOption({
       animation: false,
@@ -1035,24 +1045,25 @@ function renderFields() {
       },
       visualMap: {
         show: true,
-        min: 0, max: maxColor,
+        min: logMin, max: logMax,
         orient: "horizontal",
         left: "center", bottom: -6,
-        itemWidth: 12, itemHeight: 200,
-        text: ["mange", "få"],
+        itemWidth: 12, itemHeight: 220,
+        text: ["mange søkere", "få søkere"],
         textStyle: { color: COLORS.muted, fontSize: 11 },
-        formatter: v => FMT.int(v * v),   // invert sqrt for display
+        formatter: v => FMT.int(Math.round(Math.pow(10, v))),
         inRange: {
+          // Light green → yellow → red. Deliberately lighter at both ends
+          // so the constant black cell text always reads cleanly.
           color: [
-            "#1d6e3c",   // deep green — few
-            "#3f9d55",
-            "#7ebb4a",
-            "#c6c23f",
-            "#eec14d",   // yellow middle
-            "#e39240",
-            "#d2632f",
-            "#b3391a",
-            "#7a1f0a",   // deep red — many
+            "#d9ecc8",
+            "#b8db98",
+            "#e8e29a",
+            "#f6d87a",
+            "#f3b05b",
+            "#ea8a4a",
+            "#e16a43",
+            "#d04a35",
           ],
         },
       },
@@ -1062,14 +1073,7 @@ function renderFields() {
         label: {
           show: true,
           formatter: p => p.value[3] == null ? "—" : FMT.int(p.value[3]),
-          color: p => {
-            const c = p.value[2];
-            if (c == null) return COLORS.muted;
-            const t = c / maxColor;
-            // Dark ends of the traffic-light ramp need white text;
-            // yellow/orange middle is bright enough for dark text.
-            return (t < 0.22 || t > 0.72) ? "#fff" : "#1d2930";
-          },
+          color: "#1d2930",
           fontSize: 11.5,
           fontWeight: 500,
         },
@@ -1458,59 +1462,116 @@ function renderCompareCharts() {
 }
 
 /* ---------- Data table ---------- */
+
+const TABLE_YEARS = [2020, 2021, 2022, 2023, 2024, 2025, 2026];
+const SEARCH_YEAR_BASE = 2021;   // søkertall year index 0 = 2021
+const PG_YEAR_BASE     = 2020;   // pg years index 0 = 2020
+
 function tableColumns() {
   return [
-    { key: "inst",   label: "Institusjon",   num: false,
+    { key: "inst",  label: "Institusjon", type: "text",
       get: (r, s) => s.institutions[r.x.i] },
-    { key: "name",   label: "Studienavn",    num: false, primary: true,
+    { key: "name",  label: "Studienavn",  type: "text", primary: true,
       get: (r) => r.x.n, sub: (r, s) => s.fields[r.x.f] },
-    { key: "loc",    label: "Sted",          num: false,
+    { key: "loc",   label: "Sted",        type: "text",
       get: (r, s) => s.locations[r.x.l] },
-    { key: "code",   label: "Kode",          num: false,
+    { key: "code",  label: "Kode",        type: "text",
       get: (r) => r.x.c },
-    { key: "s",      label: "Søkere",        num: true,
+    { key: "year",  label: "År",          type: "year",
+      get: (r) => r.year, fmt: v => v == null ? "—" : String(v) },
+    { key: "s",     label: "Søkere",      type: "num",
       get: (r) => r.s, fmt: FMT.int },
-    { key: "fv",     label: "Førstevalg",    num: true, strong: true,
+    { key: "fv",    label: "Førstevalg",  type: "num", strong: true,
       get: (r) => r.fv, fmt: FMT.int },
-    { key: "p",      label: "Plasser",       num: true,
+    { key: "p",     label: "Plasser",     type: "num",
       get: (r) => r.p, fmt: FMT.int },
-    { key: "ratio",  label: "Søk/plass",     num: true,
+    { key: "ratio", label: "Søk/plass",   type: "num",
       get: (r) => (r.p > 0 && r.fv != null) ? r.fv / r.p : null, fmt: FMT.ratio },
-    { key: "kv",     label: "Kvinner %",     num: true,
+    { key: "kv",    label: "Kvinner %",   type: "num",
       get: (r) => r.kv, fmt: FMT.pct },
-    { key: "pg_ord", label: "PG ord",        num: true, pg: true,
-      get: (r) => latestPgValue(r.x, "hov_ord"),
+    { key: "pg_ord",label: "PG ord",      type: "num", pg: true,
+      get: (r) => r.pg_ord,
       fmt: v => v == null ? "—" : (v === 0 ? "0" : v.toFixed(1).replace(".", ",")) },
-    { key: "pg_fgv", label: "PG fgv",        num: true, pg: true,
-      get: (r) => latestPgValue(r.x, "hov_fgv"),
+    { key: "pg_fgv",label: "PG fgv",      type: "num", pg: true,
+      get: (r) => r.pg_fgv,
       fmt: v => v == null ? "—" : (v === 0 ? "0" : v.toFixed(1).replace(".", ",")) },
   ];
 }
 
-function latestPgValue(study, key) {
-  if (!study.pg) return null;
-  const arr = study.pg[key] || [];
-  for (let i = arr.length - 1; i >= 0; i--) if (arr[i] != null) return arr[i];
+function buildTableRows(s) {
+  // One row per (study × year) across 2020..2026
+  const rows = [];
+  for (const x of s.studies) {
+    for (const year of TABLE_YEARS) {
+      const sIdx  = year - SEARCH_YEAR_BASE;   // -1 for 2020
+      const pgIdx = year - PG_YEAR_BASE;       // 6 for 2026
+      const inSearch = sIdx >= 0 && sIdx < s.years.length;
+      const inPg     = pgIdx >= 0 && x.pg && pgIdx < 6;
+      rows.push({
+        x,
+        year,
+        s:  inSearch ? x.s[sIdx]  : null,
+        fv: inSearch ? x.fv[sIdx] : null,
+        p:  inSearch ? x.p[sIdx]  : null,
+        kv: inSearch ? x.kv[sIdx] : null,
+        pg_ord: inPg ? (x.pg.hov_ord[pgIdx] ?? null) : null,
+        pg_fgv: inPg ? (x.pg.hov_fgv[pgIdx] ?? null) : null,
+      });
+    }
+  }
+  return rows;
+}
+
+function parseNumFilter(raw) {
+  // Accepts "50", ">50", ">=50", "<50", "<=50", "50-100"
+  if (!raw) return null;
+  const t = String(raw).trim().replace(",", ".");
+  if (!t) return null;
+  const range = t.match(/^(-?\d+(?:\.\d+)?)\s*-\s*(-?\d+(?:\.\d+)?)$/);
+  if (range) return { min: +range[1], max: +range[2] };
+  const cmp = t.match(/^(>=|<=|>|<)\s*(-?\d+(?:\.\d+)?)$/);
+  if (cmp) {
+    const v = +cmp[2];
+    if (cmp[1] === ">")  return { min: v + 1e-9 };
+    if (cmp[1] === ">=") return { min: v };
+    if (cmp[1] === "<")  return { max: v - 1e-9 };
+    if (cmp[1] === "<=") return { max: v };
+  }
+  const plain = parseFloat(t);
+  if (!isNaN(plain)) return { min: plain };
   return null;
+}
+
+function filterMatches(col, row, s, filter) {
+  if (filter == null || filter === "") return true;
+  const v = col.get(row, s);
+  if (col.type === "text") {
+    const haystack = [col.get(row, s), col.sub ? col.sub(row, s) : ""].filter(Boolean).join(" ").toLowerCase();
+    return haystack.includes(String(filter).toLowerCase());
+  }
+  if (col.type === "year") {
+    if (filter === "all" || !filter) return true;
+    return String(v) === String(filter);
+  }
+  if (col.type === "num") {
+    const range = parseNumFilter(filter);
+    if (!range) return true;
+    if (v == null) return false;
+    if (range.min != null && v < range.min) return false;
+    if (range.max != null && v > range.max) return false;
+    return true;
+  }
+  return true;
 }
 
 function renderDataTable() {
   const s = state.data.sectors[state.sector];
-  const i = state.yearIdx;
   const cols = tableColumns();
   const q = state.table.search;
 
-  const yrEl = document.getElementById("data-year");
-  if (yrEl) yrEl.textContent = state.year;
+  renderYearPills();
 
-  // Build the row records with all metrics for current year
-  let rows = s.studies.map(x => ({
-    x,
-    s:  x.s[i],
-    fv: x.fv[i],
-    p:  x.p[i],
-    kv: x.kv[i],
-  }));
+  let rows = buildTableRows(s);
 
   if (q) {
     rows = rows.filter(r => {
@@ -1519,32 +1580,85 @@ function renderDataTable() {
     });
   }
 
-  // Sort
+  // Column filters
+  const cf = state.table.colFilters;
+  for (const col of cols) {
+    const f = cf[col.key];
+    if (f == null || f === "") continue;
+    rows = rows.filter(r => filterMatches(col, r, s, f));
+  }
+
+  // Sort (nulls always go to the end regardless of direction)
   const { sortKey, sortDir } = state.table;
   const col = cols.find(c => c.key === sortKey) || cols.find(c => c.key === "fv");
   rows.sort((a, b) => {
     const av = col.get(a, s);
     const bv = col.get(b, s);
-    const aIsNull = av == null;
-    const bIsNull = bv == null;
-    if (aIsNull && bIsNull) return 0;
-    if (aIsNull) return 1;   // nulls always last
-    if (bIsNull) return -1;
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
     if (typeof av === "string") return sortDir * av.localeCompare(bv, "nb");
     return sortDir * (av - bv);
   });
 
-  // Header
+  // --- HEADER: two rows (title + filter) ---
+  const head = document.getElementById("data-head");
   const headHtml = cols.map(c => {
     const active = c.key === sortKey;
     const arrow = active ? (sortDir === 1 ? "▲" : "▼") : "";
-    return `<th data-key="${c.key}" class="${c.num ? "num" : ""}${active ? " active" : ""}">
-      ${escapeHtml(c.label)} <span class="sort-arrow">${arrow}</span>
+    const numCls = (c.type === "num" || c.type === "year") ? " num" : "";
+    return `<th data-key="${c.key}" class="col-head${numCls}${active ? " active" : ""}">
+      <button class="head-label" data-key="${c.key}">${escapeHtml(c.label)}<span class="sort-arrow">${arrow}</span></button>
     </th>`;
   }).join("");
-  document.getElementById("data-head").innerHTML = headHtml;
 
-  // Limit rendered rows (pagination) to keep the DOM snappy
+  const filterHtml = cols.map(c => {
+    const val = cf[c.key] || "";
+    const placeholder = c.type === "num" ? "f.eks 50, >100, 20-40" : "filter";
+    if (c.type === "year") {
+      const opts = ["<option value=\"\">Alle år</option>"].concat(TABLE_YEARS.map(y =>
+        `<option value="${y}" ${val == y ? "selected" : ""}>${y}</option>`
+      )).join("");
+      return `<th class="col-filter num"><select data-filter="${c.key}">${opts}</select></th>`;
+    }
+    const numCls = c.type === "num" ? " num" : "";
+    return `<th class="col-filter${numCls}">
+      <input type="text" data-filter="${c.key}" placeholder="${placeholder}" value="${escapeHtml(val)}" />
+    </th>`;
+  }).join("");
+
+  head.innerHTML = `<tr class="r-head">${headHtml}</tr><tr class="r-filter">${filterHtml}</tr>`;
+
+  // Wire header clicks (sort) and filter inputs
+  head.querySelectorAll("button.head-label").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.key;
+      if (state.table.sortKey === key) state.table.sortDir = -state.table.sortDir;
+      else { state.table.sortKey = key; state.table.sortDir = (cols.find(c => c.key === key).type !== "text" ? -1 : 1); }
+      state.table.page = 0;
+      renderDataTable();
+    });
+  });
+  head.querySelectorAll("[data-filter]").forEach(inp => {
+    const handler = debounce(() => {
+      const key = inp.dataset.filter;
+      cf[key] = inp.value;
+      state.table.page = 0;
+      renderDataTable();
+      // keep focus and caret in the same input
+      const again = document.querySelector(`#data-head [data-filter="${key}"]`);
+      if (again && inp !== again) {
+        again.focus();
+        if (again.setSelectionRange && again.value) {
+          again.setSelectionRange(again.value.length, again.value.length);
+        }
+      }
+    }, 180);
+    inp.addEventListener("input", handler);
+    inp.addEventListener("change", handler);
+  });
+
+  // Pagination
   const perPage = state.table.perPage;
   const totalPages = Math.max(1, Math.ceil(rows.length / perPage));
   if (state.table.page >= totalPages) state.table.page = totalPages - 1;
@@ -1552,36 +1666,34 @@ function renderDataTable() {
   const pageRows = rows.slice(start, start + perPage);
 
   // Body
-  const bodyHtml = pageRows.map(r => {
-    const cells = cols.map(c => {
-      const raw = c.get(r, s);
-      const fmtted = c.fmt ? c.fmt(raw) : (raw ?? "—");
-      const classes = [
-        c.num ? "num" : "",
-        c.strong ? "strong" : "",
-        c.pg ? "pg" : "",
-        (c.num && (raw == null)) ? "muted" : "",
-      ].filter(Boolean).join(" ");
-      if (c.primary) {
-        return `<td class="${classes} strong">${escapeHtml(String(raw))}<div class="td-sub">${escapeHtml(c.sub ? c.sub(r, s) : "")}</div></td>`;
-      }
-      return `<td class="${classes}">${escapeHtml(String(fmtted))}</td>`;
-    }).join("");
-    return `<tr data-code="${r.x.c}" data-inst="${r.x.i}">${cells}</tr>`;
-  }).join("");
-
   const body = document.getElementById("data-body");
   if (!pageRows.length) {
-    body.innerHTML = `<tr><td class="data-empty" colspan="${cols.length}">Ingen treff.</td></tr>`;
+    body.innerHTML = `<tr><td class="data-empty" colspan="${cols.length}">Ingen rader matcher filtrene.</td></tr>`;
   } else {
-    body.innerHTML = bodyHtml;
+    body.innerHTML = pageRows.map(r => {
+      const cells = cols.map(c => {
+        const raw = c.get(r, s);
+        const fmtted = c.fmt ? c.fmt(raw) : (raw ?? "—");
+        const numCls = (c.type === "num" || c.type === "year") ? " num" : "";
+        const classes = [
+          numCls.trim(),
+          c.strong ? "strong" : "",
+          c.pg ? "pg" : "",
+          ((c.type === "num" || c.type === "year") && raw == null) ? "muted" : "",
+        ].filter(Boolean).join(" ");
+        if (c.primary) {
+          return `<td class="${classes} strong cell-primary">${escapeHtml(String(raw))}<div class="td-sub">${escapeHtml(c.sub ? c.sub(r, s) : "")}</div></td>`;
+        }
+        return `<td class="${classes}">${escapeHtml(String(fmtted))}</td>`;
+      }).join("");
+      return `<tr data-code="${r.x.c}" data-inst="${r.x.i}">${cells}</tr>`;
+    }).join("");
   }
 
-  // Count info + pagination below table
+  // Counts and pager
   const countEl = document.getElementById("data-count");
   if (countEl) countEl.textContent = rows.length.toLocaleString("nb-NO");
 
-  // Append pager under the table if we have more than one page
   let pagerWrap = document.getElementById("data-pager");
   if (!pagerWrap) {
     pagerWrap = document.createElement("div");
@@ -1590,7 +1702,7 @@ function renderDataTable() {
     document.querySelector(".data-table-wrap").insertAdjacentElement("afterend", pagerWrap);
   }
   if (totalPages > 1) {
-    pagerWrap.innerHTML = `<div class="top-pager" style="border: 0; padding: 0; margin: 0;">${pagerHTML(state.table.page, totalPages, rows.length).replace(/^<div class="top-pager">|<\/div>$/g, "")}</div>`;
+    pagerWrap.innerHTML = pagerHTML(state.table.page, totalPages, rows.length);
     wirePager(pagerWrap, (dir) => {
       state.table.page = (dir === Infinity) ? totalPages - 1 : (dir === -Infinity) ? 0 : clampPage(state.table.page + dir, totalPages);
       renderDataTable();
@@ -1599,16 +1711,6 @@ function renderDataTable() {
     pagerWrap.innerHTML = "";
   }
 
-  // Header click → sort
-  document.querySelectorAll("#data-head th").forEach(th => {
-    th.addEventListener("click", () => {
-      const key = th.dataset.key;
-      if (state.table.sortKey === key) state.table.sortDir = -state.table.sortDir;
-      else { state.table.sortKey = key; state.table.sortDir = (cols.find(c => c.key === key).num ? -1 : 1); }
-      state.table.page = 0;
-      renderDataTable();
-    });
-  });
   // Row click → drawer
   document.querySelectorAll("#data-body tr[data-code]").forEach(tr => {
     tr.addEventListener("click", () => openDrawer(findStudy(tr.dataset.code, +tr.dataset.inst)));
@@ -1617,18 +1719,64 @@ function renderDataTable() {
   renderIcons();
 }
 
+function renderYearPills() {
+  const wrap = document.getElementById("data-year-pills");
+  if (!wrap) return;
+  const current = state.table.colFilters.year || "";
+  const pills = ["<span class=\"pill-label\">År</span>"];
+  pills.push(`<button data-year="" class="${current === "" ? "active" : ""}">Alle år</button>`);
+  TABLE_YEARS.forEach(y => {
+    pills.push(`<button data-year="${y}" class="${String(current) === String(y) ? "active" : ""}">${y}</button>`);
+  });
+  // Quick-link extras
+  pills.push(`<span class="pill-label" style="margin-left:10px">Kun poenggrense</span>`);
+  const pgActive = state.table.colFilters.pg_ord;
+  pills.push(`<button data-quick="pg" class="${pgActive ? "active" : ""}">≥ 1</button>`);
+  const yrEl = document.getElementById("data-year");
+  if (yrEl) yrEl.textContent = current === "" ? "2020–2026" : String(current);
+
+  wrap.innerHTML = pills.join("");
+  wrap.querySelectorAll("button[data-year]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      state.table.colFilters.year = btn.dataset.year;
+      state.table.page = 0;
+      renderDataTable();
+    });
+  });
+  const pgBtn = wrap.querySelector("button[data-quick=\"pg\"]");
+  if (pgBtn) pgBtn.addEventListener("click", () => {
+    if (state.table.colFilters.pg_ord) delete state.table.colFilters.pg_ord;
+    else state.table.colFilters.pg_ord = ">0";
+    state.table.page = 0;
+    renderDataTable();
+  });
+}
+
+function debounce(fn, ms) {
+  let timer = null;
+  return function (...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), ms);
+  };
+}
+
 function exportDataCsv() {
   const s = state.data.sectors[state.sector];
-  const i = state.yearIdx;
   const cols = tableColumns();
   const q = state.table.search;
 
-  let rows = s.studies.map(x => ({ x, s: x.s[i], fv: x.fv[i], p: x.p[i], kv: x.kv[i] }));
+  let rows = buildTableRows(s);
   if (q) {
     rows = rows.filter(r => {
       const hay = `${r.x.n} ${s.institutions[r.x.i]} ${s.locations[r.x.l]} ${s.fields[r.x.f]} ${r.x.c}`.toLowerCase();
       return hay.includes(q);
     });
+  }
+  const cf = state.table.colFilters;
+  for (const col of cols) {
+    const f = cf[col.key];
+    if (f == null || f === "") continue;
+    rows = rows.filter(r => filterMatches(col, r, s, f));
   }
   const { sortKey, sortDir } = state.table;
   const col = cols.find(c => c.key === sortKey) || cols[0];
@@ -1642,13 +1790,13 @@ function exportDataCsv() {
 
   const csvEscape = (v) => {
     if (v == null) return "";
-    const s = String(v);
-    return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    const s2 = String(v);
+    return /[",;\n]/.test(s2) ? `"${s2.replace(/"/g, '""')}"` : s2;
   };
   const header = cols.map(c => csvEscape(c.label)).join(";");
   const lines = rows.map(r => cols.map(c => {
     const raw = c.get(r, s);
-    if (c.num) return raw == null ? "" : String(raw).replace(".", ",");
+    if (c.type === "num" || c.type === "year") return raw == null ? "" : String(raw).replace(".", ",");
     return csvEscape(raw);
   }).join(";"));
   const csv = "﻿" + [header, ...lines].join("\n");
@@ -1657,10 +1805,10 @@ function exportDataCsv() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `sokertall-${state.sector}-${state.year}.csv`;
+  a.download = `sokertall-${state.sector}-alle-aar.csv`;
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
-  showToast("CSV lastet ned");
+  showToast(`CSV lastet ned (${rows.length.toLocaleString("nb-NO")} rader)`);
 }
 
 /* ---------- Toast ---------- */
