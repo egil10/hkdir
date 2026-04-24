@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Søkertall · HK-dir Grunndata</title>
+  <meta name="description" content="Utforsk søkertall fra Samordna opptak til universiteter og høgskoler i Norge, 2021–2026." />
+
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet" />
+
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="assets/baeb68e1-87a6-4fe6-ab2b-a603ade0f355-w_300_h_100.png" />
+</head>
+<body>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <img src="assets/baeb68e1-87a6-4fe6-ab2b-a603ade0f355-w_300_h_100.png" alt="HK-dir" class="brand-mark" />
+        <div class="brand-text">
+          <div class="brand-title">Søkertall</div>
+          <div class="brand-sub">Samordna opptak · 2021–2026</div>
+        </div>
+      </div>
+
+      <nav class="tabs" role="tablist" aria-label="Hovedvisning">
+        <button class="tab active" data-view="overview" role="tab"><i data-lucide="gauge"></i><span>Oversikt</span></button>
+        <button class="tab" data-view="explore" role="tab"><i data-lucide="search"></i><span>Utforsk</span></button>
+        <button class="tab" data-view="compare" role="tab"><i data-lucide="git-compare"></i><span>Sammenlign</span></button>
+        <button class="tab" data-view="institutions" role="tab"><i data-lucide="landmark"></i><span>Institusjoner</span></button>
+        <button class="tab" data-view="fields" role="tab"><i data-lucide="layers"></i><span>Fagområder</span></button>
+      </nav>
+
+      <div class="topbar-actions">
+        <button id="year-toggle" class="year-pill" title="Velg referanseår">
+          <i data-lucide="calendar"></i>
+          <span>2026</span>
+          <i data-lucide="chevron-down"></i>
+        </button>
+        <a class="ghost-btn" href="https://hkdir.no/sokertall-fra-samordna-opptak-til-nedlasting#Universitet%20og%20h%C3%B8gskoler" target="_blank" rel="noopener">
+          <i data-lucide="external-link"></i><span>Kilde</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main id="app" class="shell">
+    <!-- OVERVIEW -->
+    <section id="view-overview" class="view active">
+      <div class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow"><i data-lucide="sparkles"></i> Dashboard</div>
+          <h1>Et blikk på norsk høyere utdanning</h1>
+          <p>Utforsk søkertall, studieplasser og kjønnsbalanse for alle studieprogram i samordna opptak — fra 2021 til 2026.</p>
+          <div class="hero-meta">
+            <div><i data-lucide="database"></i><span id="m-studies">—</span> studier</div>
+            <div><i data-lucide="landmark"></i><span id="m-institutions">—</span> institusjoner</div>
+            <div><i data-lucide="map-pin"></i><span id="m-locations">—</span> studiesteder</div>
+            <div><i data-lucide="layers"></i><span id="m-fields">—</span> fagområder</div>
+          </div>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <div class="ring ring-1"></div>
+          <div class="ring ring-2"></div>
+          <div class="ring ring-3"></div>
+          <div class="glow"></div>
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <article class="kpi" data-accent="primary">
+          <div class="kpi-top"><i data-lucide="users"></i><span>Alle søkere</span></div>
+          <div class="kpi-value" id="kpi-applicants">—</div>
+          <div class="kpi-delta" id="kpi-applicants-delta"></div>
+        </article>
+        <article class="kpi" data-accent="teal">
+          <div class="kpi-top"><i data-lucide="target"></i><span>Førstevalg</span></div>
+          <div class="kpi-value" id="kpi-first">—</div>
+          <div class="kpi-delta" id="kpi-first-delta"></div>
+        </article>
+        <article class="kpi" data-accent="gold">
+          <div class="kpi-top"><i data-lucide="armchair"></i><span>Studieplasser</span></div>
+          <div class="kpi-value" id="kpi-seats">—</div>
+          <div class="kpi-delta" id="kpi-seats-delta"></div>
+        </article>
+        <article class="kpi" data-accent="forest">
+          <div class="kpi-top"><i data-lucide="trending-up"></i><span>Søkere per plass</span></div>
+          <div class="kpi-value" id="kpi-ratio">—</div>
+          <div class="kpi-delta" id="kpi-ratio-delta"></div>
+        </article>
+        <article class="kpi" data-accent="rose">
+          <div class="kpi-top"><i data-lucide="percent"></i><span>Kvinneandel (førstevalg)</span></div>
+          <div class="kpi-value" id="kpi-women">—</div>
+          <div class="kpi-delta" id="kpi-women-delta"></div>
+        </article>
+      </div>
+
+      <div class="grid-2">
+        <section class="card">
+          <header class="card-header">
+            <div>
+              <h2>Utvikling over tid</h2>
+              <p class="muted">Totale søkertall, førstevalg og studieplasser per år.</p>
+            </div>
+            <div class="seg" data-group="trend-metric">
+              <button class="seg-btn active" data-value="abs">Absolutt</button>
+              <button class="seg-btn" data-value="idx">Indeksert (2021=100)</button>
+            </div>
+          </header>
+          <div id="chart-trend" class="chart"></div>
+        </section>
+
+        <section class="card">
+          <header class="card-header">
+            <div>
+              <h2>Fagområder — førstevalgssøkere</h2>
+              <p class="muted">Sammensetning i <span id="year-label-fields">2026</span>.</p>
+            </div>
+            <div class="seg" data-group="field-metric">
+              <button class="seg-btn active" data-value="fv">Førstevalg</button>
+              <button class="seg-btn" data-value="s">Alle søkere</button>
+              <button class="seg-btn" data-value="p">Plasser</button>
+            </div>
+          </header>
+          <div id="chart-fields" class="chart chart-tall"></div>
+        </section>
+      </div>
+
+      <div class="grid-2">
+        <section class="card">
+          <header class="card-header">
+            <div>
+              <h2>Topp 10 studier</h2>
+              <p class="muted">Mest populære studier etter førstevalg i <span id="year-label-top">2026</span>.</p>
+            </div>
+            <div class="seg" data-group="top-metric">
+              <button class="seg-btn active" data-value="fv">Førstevalg</button>
+              <button class="seg-btn" data-value="ratio">Søkere/plass</button>
+              <button class="seg-btn" data-value="kv">Kvinneandel</button>
+            </div>
+          </header>
+          <div id="top-list" class="top-list"></div>
+        </section>
+
+        <section class="card">
+          <header class="card-header">
+            <div>
+              <h2>Institusjoner — størst vekst</h2>
+              <p class="muted">Endring i førstevalg mellom <span id="year-label-growth-from">2021</span> og <span id="year-label-growth-to">2026</span>.</p>
+            </div>
+          </header>
+          <div id="chart-growth" class="chart chart-tall"></div>
+        </section>
+      </div>
+    </section>
+
+    <!-- EXPLORE -->
+    <section id="view-explore" class="view">
+      <div class="toolbar">
+        <div class="search-wrap">
+          <i data-lucide="search"></i>
+          <input id="search" type="search" placeholder="Søk etter studie, institusjon, sted eller fag…" autocomplete="off" />
+          <kbd>/</kbd>
+        </div>
+        <div class="filters">
+          <div class="filter">
+            <label>Institusjon</label>
+            <select id="f-inst"></select>
+          </div>
+          <div class="filter">
+            <label>Fagområde</label>
+            <select id="f-field"></select>
+          </div>
+          <div class="filter">
+            <label>Sted</label>
+            <select id="f-loc"></select>
+          </div>
+          <div class="filter">
+            <label>Sorter</label>
+            <select id="f-sort">
+              <option value="fv-desc">Flest førstevalg</option>
+              <option value="s-desc">Flest søkere</option>
+              <option value="ratio-desc">Høyest konkurranse</option>
+              <option value="kv-desc">Høyest kvinneandel</option>
+              <option value="kv-asc">Lavest kvinneandel</option>
+              <option value="growth-desc">Størst vekst (2021→2026)</option>
+              <option value="growth-asc">Størst nedgang (2021→2026)</option>
+              <option value="name-asc">Navn A–Å</option>
+            </select>
+          </div>
+          <button id="reset-filters" class="ghost-btn" title="Nullstill filtre"><i data-lucide="rotate-ccw"></i><span>Nullstill</span></button>
+        </div>
+      </div>
+
+      <div class="results-bar">
+        <div><span id="result-count">0</span> studier funnet</div>
+        <div class="hint"><kbd>Enter</kbd> første treff · <kbd>Esc</kbd> lukk</div>
+      </div>
+
+      <div id="study-list" class="study-list"></div>
+      <div id="list-more" class="list-more"></div>
+    </section>
+
+    <!-- COMPARE -->
+    <section id="view-compare" class="view">
+      <div class="compare-head">
+        <div>
+          <h2>Sammenlign studier</h2>
+          <p class="muted">Legg til opptil 6 studier og se utvikling side om side.</p>
+        </div>
+        <div class="compare-search">
+          <i data-lucide="plus-circle"></i>
+          <input id="compare-add" type="search" placeholder="Finn og legg til studie…" autocomplete="off" />
+          <div id="compare-suggest" class="suggest"></div>
+        </div>
+      </div>
+
+      <div id="compare-chips" class="chips"></div>
+
+      <div class="grid-2">
+        <section class="card">
+          <header class="card-header">
+            <div><h2>Førstevalg over tid</h2></div>
+          </header>
+          <div id="chart-cmp-fv" class="chart chart-tall"></div>
+        </section>
+        <section class="card">
+          <header class="card-header">
+            <div><h2>Søkere per plass</h2></div>
+          </header>
+          <div id="chart-cmp-ratio" class="chart chart-tall"></div>
+        </section>
+        <section class="card">
+          <header class="card-header">
+            <div><h2>Alle søkere</h2></div>
+          </header>
+          <div id="chart-cmp-s" class="chart chart-tall"></div>
+        </section>
+        <section class="card">
+          <header class="card-header">
+            <div><h2>Kvinneandel førstevalg (%)</h2></div>
+          </header>
+          <div id="chart-cmp-kv" class="chart chart-tall"></div>
+        </section>
+      </div>
+    </section>
+
+    <!-- INSTITUTIONS -->
+    <section id="view-institutions" class="view">
+      <div class="section-head">
+        <div>
+          <h2>Institusjoner</h2>
+          <p class="muted">27 institusjoner — klikk for detaljer.</p>
+        </div>
+      </div>
+      <div id="inst-grid" class="inst-grid"></div>
+    </section>
+
+    <!-- FIELDS -->
+    <section id="view-fields" class="view">
+      <div class="section-head">
+        <div>
+          <h2>Fagområder</h2>
+          <p class="muted">Hvordan søkermassen fordeler seg på fagområder over tid.</p>
+        </div>
+      </div>
+      <section class="card">
+        <div id="chart-fields-heat" class="chart chart-heat"></div>
+      </section>
+      <div id="field-cards" class="field-cards"></div>
+    </section>
+  </main>
+
+  <!-- Detail drawer -->
+  <aside id="drawer" class="drawer" aria-hidden="true">
+    <div class="drawer-backdrop"></div>
+    <div class="drawer-panel" role="dialog" aria-modal="true">
+      <header class="drawer-head">
+        <div>
+          <div class="drawer-eyebrow" id="d-field">—</div>
+          <h3 id="d-name">—</h3>
+          <div class="drawer-meta"><i data-lucide="landmark"></i><span id="d-inst"></span> · <i data-lucide="map-pin"></i><span id="d-loc"></span> · <i data-lucide="hash"></i><span id="d-code"></span></div>
+        </div>
+        <button id="drawer-close" class="icon-btn" aria-label="Lukk"><i data-lucide="x"></i></button>
+      </header>
+      <div class="drawer-kpis" id="d-kpis"></div>
+      <div class="drawer-chart" id="d-chart"></div>
+      <div class="drawer-actions">
+        <button id="d-add-compare" class="primary-btn"><i data-lucide="git-compare"></i>Legg til sammenligning</button>
+      </div>
+      <div class="drawer-table" id="d-table"></div>
+    </div>
+  </aside>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div>
+        <div class="foot-title">HK-dir Grunndata · Søkertall</div>
+        <div class="muted small">Data fra Samordna opptak publisert av Direktoratet for høyere utdanning og kompetanse. Visualisert for utforskning — ikke en offisiell HK-dir-tjeneste.</div>
+      </div>
+      <a href="https://hkdir.no/sokertall-fra-samordna-opptak-til-nedlasting#Universitet%20og%20h%C3%B8gskoler" target="_blank" rel="noopener" class="foot-link">
+        <i data-lucide="external-link"></i><span>hkdir.no — last ned grunndata</span>
+      </a>
+    </div>
+  </footer>
+
+  <div id="year-menu" class="menu" hidden>
+    <!-- populated by JS -->
+  </div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>

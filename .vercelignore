@@ -1,0 +1,6 @@
+.archive/
+.git/
+__pycache__/
+*.pyc
+build_data.py
+data/*.xlsx
