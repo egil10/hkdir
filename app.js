@@ -1066,21 +1066,29 @@ function renderPoengView() {
   document.getElementById("pg-kpi-open").textContent = FMT.int(open);
   document.getElementById("pg-kpi-open-note").textContent = `${valid.length ? ((open / valid.length) * 100).toFixed(0) : 0} % av disse`;
 
-  // Top 10 hardest
-  const top = valid
-    .filter(r => r.v > 0)
-    .sort((a, b) => b.v - a.v)
-    .slice(0, 10);
-  document.getElementById("pg-top-hard").innerHTML = top.map((r, i) => `
-    <div class="top-row" data-code="${r.x.c}" data-inst="${r.x.i}">
-      <div class="rank">${i + 1}</div>
+  // Top 10 hardest — split normal vs. programmer med særskilt opptak (opptaksprøve / tilleggspoeng
+  // som gjør totalen > 80 og derfor ikke direkte sammenlignbar med ordinær poengberegning).
+  const PG_NORMAL_MAX = 80;
+  const sortedHard = valid.filter(r => r.v > 0).sort((a, b) => b.v - a.v);
+  const normal   = sortedHard.filter(r => r.v <= PG_NORMAL_MAX).slice(0, 10);
+  const special  = sortedHard.filter(r => r.v >  PG_NORMAL_MAX);
+
+  const rowHTML = (r, rank, isSpecial) => `
+    <div class="top-row${isSpecial ? " top-row-special" : ""}" data-code="${r.x.c}" data-inst="${r.x.i}">
+      <div class="rank">${rank}</div>
       <div>
-        <div class="title">${escapeHtml(r.x.n)}</div>
+        <div class="title">${escapeHtml(r.x.n)}${isSpecial ? ' <span class="badge-special" title="Opptaksprøve / tilleggspoeng — ikke direkte sammenlignbar">særskilt opptak</span>' : ""}</div>
         <div class="sub">${escapeHtml(s.institutions[r.x.i])} · ${escapeHtml(s.locations[r.x.l])}</div>
       </div>
       <div class="value">${r.v.toFixed(1).replace(".", ",")}</div>
-    </div>
-  `).join("") || `<div class="muted small" style="padding:16px">Ingen data.</div>`;
+    </div>`;
+
+  let html = normal.map((r, i) => rowHTML(r, i + 1, false)).join("");
+  if (special.length) {
+    html += `<div class="top-divider"><i data-lucide="info"></i> Særskilt opptak — opptaksprøve / tilleggspoeng</div>`;
+    html += special.slice(0, 5).map(r => rowHTML(r, "★", true)).join("");
+  }
+  document.getElementById("pg-top-hard").innerHTML = html || `<div class="muted small" style="padding:16px">Ingen data.</div>`;
   document.querySelectorAll("#pg-top-hard .top-row").forEach(el => {
     el.addEventListener("click", () => openDrawer(findStudy(el.dataset.code, +el.dataset.inst)));
   });

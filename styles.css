@@ -395,6 +395,34 @@ kbd {
   font-size: 15px;
   white-space: nowrap;
 }
+.top-row-special { opacity: 0.82; }
+.top-row-special .value { color: var(--muted); }
+.badge-special {
+  display: inline-block;
+  margin-left: 6px;
+  font-family: "Inter", sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  padding: 1px 6px;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+.top-divider {
+  display: flex; align-items: center; gap: 6px;
+  margin: 10px 4px 4px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+  color: var(--muted);
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.top-divider i { width: 13px; height: 13px; }
 
 /* ---------- Explore toolbar ---------- */
 .toolbar {
