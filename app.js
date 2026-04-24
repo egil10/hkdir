@@ -45,7 +45,12 @@ const state = {
   compare: [],
   charts: {},
   pg: { round: "hov", quota: "ord", year: 2025, drawerRound: "hov" },
+  pages: { top: 0, pgHard: 0, pgChange: 0 },
+  topMetric: "fv",
+  table: { search: "", sortKey: "fv", sortDir: -1, page: 0, perPage: 200 },
 };
+
+const PAGE_SIZE = 10;
 
 const PG_YEARS = [2020, 2021, 2022, 2023, 2024, 2025];
 const PG_SERIES_META = {
@@ -85,7 +90,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const applyHash = () => {
     const h = (location.hash || "").replace(/^#/, "");
-    if (["overview", "explore", "compare", "institutions", "fields", "poeng"].includes(h)) setTab(h);
+    if (["overview", "explore", "compare", "institutions", "fields", "poeng", "data"].includes(h)) setTab(h);
   };
   applyHash();
   window.addEventListener("hashchange", applyHash);
@@ -185,9 +190,21 @@ function wireStatic() {
   document.querySelectorAll('.seg[data-group="top-metric"] .seg-btn').forEach(b => {
     b.addEventListener("click", () => {
       setSegActive(b);
+      state.topMetric = b.dataset.value;
+      state.pages.top = 0;
       renderTopList(b.dataset.value);
     });
   });
+
+  // Data table wiring
+  const dataSearch = document.getElementById("data-search");
+  if (dataSearch) dataSearch.addEventListener("input", e => {
+    state.table.search = e.target.value.trim().toLowerCase();
+    state.table.page = 0;
+    renderDataTable();
+  });
+  const dataExport = document.getElementById("data-export");
+  if (dataExport) dataExport.addEventListener("click", exportDataCsv);
 
   // Search + filters
   els["search"].addEventListener("input", (e) => {
@@ -255,6 +272,7 @@ function setTab(name) {
   if (name === "fields") renderFields();
   if (name === "compare") { renderCompareChips(); renderCompareCharts(); }
   if (name === "poeng") renderPoengView();
+  if (name === "data") renderDataTable();
   // Resize after the view is visible so ECharts picks up real dimensions
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
@@ -507,7 +525,7 @@ function renderFieldsChart(metric) {
 function renderTopList(metric) {
   const s = state.data.sectors[state.sector];
   const i = state.yearIdx;
-  const list = s.studies
+  const all = s.studies
     .map(x => {
       const fv = x.fv[i], sAll = x.s[i], p = x.p[i], kv = x.kv[i];
       let value = null;
@@ -516,17 +534,22 @@ function renderTopList(metric) {
       else if (metric === "kv") value = kv;
       return { x, fv, sAll, p, kv, value };
     })
-    .filter(r => r.value != null && (metric !== "ratio" || (r.p >= 10)))   // exclude tiny for ratio
+    .filter(r => r.value != null && (metric !== "ratio" || (r.p >= 10)))
     .filter(r => metric !== "kv" || r.fv >= 30)
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 10);
+    .sort((a, b) => b.value - a.value);
 
   const fmtVal = metric === "fv" ? FMT.int : metric === "ratio" ? FMT.ratio : FMT.pct;
   els["year-label-top"].textContent = state.year;
 
-  const html = list.map((r, idx) => `
+  const totalPages = Math.max(1, Math.ceil(all.length / PAGE_SIZE));
+  if (state.pages.top >= totalPages) state.pages.top = totalPages - 1;
+  const page = state.pages.top;
+  const start = page * PAGE_SIZE;
+  const slice = all.slice(start, start + PAGE_SIZE);
+
+  const rows = slice.map((r, idx) => `
     <div class="top-row" data-code="${r.x.c}" data-inst="${r.x.i}">
-      <div class="rank">${idx + 1}</div>
+      <div class="rank">${start + idx + 1}</div>
       <div>
         <div class="title">${escapeHtml(r.x.n)}</div>
         <div class="sub">${escapeHtml(s.institutions[r.x.i])} · ${escapeHtml(s.locations[r.x.l])}</div>
@@ -535,11 +558,47 @@ function renderTopList(metric) {
     </div>
   `).join("");
 
+  const pager = pagerHTML(page, totalPages, all.length);
   const wrap = document.getElementById("top-list");
-  wrap.innerHTML = html || `<div class="muted small" style="padding:16px">Ingen data.</div>`;
+  wrap.innerHTML = (rows || `<div class="muted small" style="padding:16px">Ingen data.</div>`) + pager;
   wrap.querySelectorAll(".top-row").forEach(el => {
     el.addEventListener("click", () => openDrawer(findStudy(el.dataset.code, +el.dataset.inst)));
   });
+  wirePager(wrap, (dir) => { state.pages.top = clampPage(state.pages.top + dir, totalPages); renderTopList(state.topMetric); });
+  renderIcons();
+}
+
+function pagerHTML(page, totalPages, totalItems) {
+  const from = page * PAGE_SIZE + 1;
+  const to = Math.min((page + 1) * PAGE_SIZE, totalItems);
+  return `
+    <div class="top-pager">
+      <div class="pg-info">${from}–${to} av ${totalItems.toLocaleString("nb-NO")}</div>
+      <div class="pg-btns">
+        <button data-pg="first" ${page === 0 ? "disabled" : ""} title="Første side"><i data-lucide="chevrons-left"></i></button>
+        <button data-pg="prev"  ${page === 0 ? "disabled" : ""}><i data-lucide="chevron-left"></i> Forrige</button>
+        <button data-pg="next"  ${page >= totalPages - 1 ? "disabled" : ""}>Neste <i data-lucide="chevron-right"></i></button>
+        <button data-pg="last"  ${page >= totalPages - 1 ? "disabled" : ""} title="Siste side"><i data-lucide="chevrons-right"></i></button>
+      </div>
+    </div>`;
+}
+
+function wirePager(wrap, handler) {
+  wrap.querySelectorAll(".top-pager button").forEach(b => {
+    b.addEventListener("click", () => {
+      const action = b.dataset.pg;
+      if (action === "next") handler(1);
+      else if (action === "prev") handler(-1);
+      else if (action === "first") handler(-Infinity);
+      else if (action === "last") handler(Infinity);
+    });
+  });
+}
+
+function clampPage(p, totalPages) {
+  if (p < 0) return 0;
+  if (p >= totalPages) return totalPages - 1;
+  return p;
 }
 
 /* ---------- Growth chart ---------- */
@@ -1116,12 +1175,17 @@ function renderPoengView() {
   document.getElementById("pg-kpi-open").textContent = FMT.int(open);
   document.getElementById("pg-kpi-open-note").textContent = `${valid.length ? ((open / valid.length) * 100).toFixed(0) : 0} % av disse`;
 
-  // Top 10 hardest — split normal vs. programmer med særskilt opptak (opptaksprøve / tilleggspoeng
-  // som gjør totalen > 80 og derfor ikke direkte sammenlignbar med ordinær poengberegning).
+  // Hardest — ordinary programs (≤80) paginated; særskilt opptak appended once on last page.
   const PG_NORMAL_MAX = 80;
   const sortedHard = valid.filter(r => r.v > 0).sort((a, b) => b.v - a.v);
-  const normal   = sortedHard.filter(r => r.v <= PG_NORMAL_MAX).slice(0, 10);
+  const normal   = sortedHard.filter(r => r.v <= PG_NORMAL_MAX);
   const special  = sortedHard.filter(r => r.v >  PG_NORMAL_MAX);
+
+  const hardPages = Math.max(1, Math.ceil(normal.length / PAGE_SIZE));
+  if (state.pages.pgHard >= hardPages) state.pages.pgHard = hardPages - 1;
+  const hp = state.pages.pgHard;
+  const hardStart = hp * PAGE_SIZE;
+  const hardSlice = normal.slice(hardStart, hardStart + PAGE_SIZE);
 
   const rowHTML = (r, rank, isSpecial) => `
     <div class="top-row${isSpecial ? " top-row-special" : ""}" data-code="${r.x.c}" data-inst="${r.x.i}">
@@ -1133,14 +1197,20 @@ function renderPoengView() {
       <div class="value">${r.v.toFixed(1).replace(".", ",")}</div>
     </div>`;
 
-  let html = normal.map((r, i) => rowHTML(r, i + 1, false)).join("");
-  if (special.length) {
+  let html = hardSlice.map((r, idx) => rowHTML(r, hardStart + idx + 1, false)).join("");
+  if (hp === hardPages - 1 && special.length) {
     html += `<div class="top-divider"><i data-lucide="info"></i> Særskilt opptak — opptaksprøve / tilleggspoeng</div>`;
     html += special.slice(0, 5).map(r => rowHTML(r, "★", true)).join("");
   }
-  document.getElementById("pg-top-hard").innerHTML = html || `<div class="muted small" style="padding:16px">Ingen data.</div>`;
-  document.querySelectorAll("#pg-top-hard .top-row").forEach(el => {
+  html += pagerHTML(hp, hardPages, normal.length);
+  const hardWrap = document.getElementById("pg-top-hard");
+  hardWrap.innerHTML = html || `<div class="muted small" style="padding:16px">Ingen data.</div>`;
+  hardWrap.querySelectorAll(".top-row").forEach(el => {
     el.addEventListener("click", () => openDrawer(findStudy(el.dataset.code, +el.dataset.inst)));
+  });
+  wirePager(hardWrap, (dir) => {
+    state.pages.pgHard = (dir === Infinity) ? hardPages - 1 : (dir === -Infinity) ? 0 : clampPage(hp + dir, hardPages);
+    renderPoengView();
   });
 
   // Top change: sort by abs change 2020 -> 2025 (or first->last valid)
@@ -1155,10 +1225,14 @@ function renderPoengView() {
     })
     .filter(Boolean);
   changes.forEach(c => c.delta = c.to - c.from);
-  const top5Up = [...changes].sort((a, b) => b.delta - a.delta).slice(0, 5);
-  const top5Dn = [...changes].sort((a, b) => a.delta - b.delta).slice(0, 5);
-  const both = [...top5Up, ...top5Dn];
-  document.getElementById("pg-top-change").innerHTML = both.map((c, i) => `
+  // Sorted by absolute delta descending — biggest movers first (either direction)
+  const changeSorted = [...changes].sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+  const changePages = Math.max(1, Math.ceil(changeSorted.length / PAGE_SIZE));
+  if (state.pages.pgChange >= changePages) state.pages.pgChange = changePages - 1;
+  const cp = state.pages.pgChange;
+  const cStart = cp * PAGE_SIZE;
+  const cSlice = changeSorted.slice(cStart, cStart + PAGE_SIZE);
+  const changeHtml = cSlice.map(c => `
     <div class="top-row" data-code="${c.x.c}" data-inst="${c.x.i}">
       <div class="rank" style="color:${c.delta > 0 ? COLORS.teal : COLORS.primary}">${c.delta > 0 ? "↑" : "↓"}</div>
       <div>
@@ -1167,9 +1241,15 @@ function renderPoengView() {
       </div>
       <div class="value" style="color:${c.delta > 0 ? COLORS.teal : COLORS.primary}">${c.delta > 0 ? "+" : ""}${c.delta.toFixed(1).replace(".", ",")}</div>
     </div>
-  `).join("") || `<div class="muted small" style="padding:16px">Ingen data.</div>`;
-  document.querySelectorAll("#pg-top-change .top-row").forEach(el => {
+  `).join("") + pagerHTML(cp, changePages, changeSorted.length);
+  const changeWrap = document.getElementById("pg-top-change");
+  changeWrap.innerHTML = changeHtml || `<div class="muted small" style="padding:16px">Ingen data.</div>`;
+  changeWrap.querySelectorAll(".top-row").forEach(el => {
     el.addEventListener("click", () => openDrawer(findStudy(el.dataset.code, +el.dataset.inst)));
+  });
+  wirePager(changeWrap, (dir) => {
+    state.pages.pgChange = (dir === Infinity) ? changePages - 1 : (dir === -Infinity) ? 0 : clampPage(cp + dir, changePages);
+    renderPoengView();
   });
 
   // Chart: median poenggrense per field over years
@@ -1359,6 +1439,212 @@ function renderCompareCharts() {
   build("ratio", "chart-cmp-ratio", FMT.ratio);
   build("s",     "chart-cmp-s",     FMT.int);
   build("kv",    "chart-cmp-kv",    v => FMT.pct(v));
+}
+
+/* ---------- Data table ---------- */
+function tableColumns() {
+  return [
+    { key: "inst",   label: "Institusjon",   num: false,
+      get: (r, s) => s.institutions[r.x.i] },
+    { key: "name",   label: "Studienavn",    num: false, primary: true,
+      get: (r) => r.x.n, sub: (r, s) => s.fields[r.x.f] },
+    { key: "loc",    label: "Sted",          num: false,
+      get: (r, s) => s.locations[r.x.l] },
+    { key: "code",   label: "Kode",          num: false,
+      get: (r) => r.x.c },
+    { key: "s",      label: "Søkere",        num: true,
+      get: (r) => r.s, fmt: FMT.int },
+    { key: "fv",     label: "Førstevalg",    num: true, strong: true,
+      get: (r) => r.fv, fmt: FMT.int },
+    { key: "p",      label: "Plasser",       num: true,
+      get: (r) => r.p, fmt: FMT.int },
+    { key: "ratio",  label: "Søk/plass",     num: true,
+      get: (r) => (r.p > 0 && r.fv != null) ? r.fv / r.p : null, fmt: FMT.ratio },
+    { key: "kv",     label: "Kvinner %",     num: true,
+      get: (r) => r.kv, fmt: FMT.pct },
+    { key: "pg_ord", label: "PG ord",        num: true, pg: true,
+      get: (r) => latestPgValue(r.x, "hov_ord"),
+      fmt: v => v == null ? "—" : (v === 0 ? "0" : v.toFixed(1).replace(".", ",")) },
+    { key: "pg_fgv", label: "PG fgv",        num: true, pg: true,
+      get: (r) => latestPgValue(r.x, "hov_fgv"),
+      fmt: v => v == null ? "—" : (v === 0 ? "0" : v.toFixed(1).replace(".", ",")) },
+  ];
+}
+
+function latestPgValue(study, key) {
+  if (!study.pg) return null;
+  const arr = study.pg[key] || [];
+  for (let i = arr.length - 1; i >= 0; i--) if (arr[i] != null) return arr[i];
+  return null;
+}
+
+function renderDataTable() {
+  const s = state.data.sectors[state.sector];
+  const i = state.yearIdx;
+  const cols = tableColumns();
+  const q = state.table.search;
+
+  const yrEl = document.getElementById("data-year");
+  if (yrEl) yrEl.textContent = state.year;
+
+  // Build the row records with all metrics for current year
+  let rows = s.studies.map(x => ({
+    x,
+    s:  x.s[i],
+    fv: x.fv[i],
+    p:  x.p[i],
+    kv: x.kv[i],
+  }));
+
+  if (q) {
+    rows = rows.filter(r => {
+      const hay = `${r.x.n} ${s.institutions[r.x.i]} ${s.locations[r.x.l]} ${s.fields[r.x.f]} ${r.x.c}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }
+
+  // Sort
+  const { sortKey, sortDir } = state.table;
+  const col = cols.find(c => c.key === sortKey) || cols.find(c => c.key === "fv");
+  rows.sort((a, b) => {
+    const av = col.get(a, s);
+    const bv = col.get(b, s);
+    const aIsNull = av == null;
+    const bIsNull = bv == null;
+    if (aIsNull && bIsNull) return 0;
+    if (aIsNull) return 1;   // nulls always last
+    if (bIsNull) return -1;
+    if (typeof av === "string") return sortDir * av.localeCompare(bv, "nb");
+    return sortDir * (av - bv);
+  });
+
+  // Header
+  const headHtml = cols.map(c => {
+    const active = c.key === sortKey;
+    const arrow = active ? (sortDir === 1 ? "▲" : "▼") : "";
+    return `<th data-key="${c.key}" class="${c.num ? "num" : ""}${active ? " active" : ""}">
+      ${escapeHtml(c.label)} <span class="sort-arrow">${arrow}</span>
+    </th>`;
+  }).join("");
+  document.getElementById("data-head").innerHTML = headHtml;
+
+  // Limit rendered rows (pagination) to keep the DOM snappy
+  const perPage = state.table.perPage;
+  const totalPages = Math.max(1, Math.ceil(rows.length / perPage));
+  if (state.table.page >= totalPages) state.table.page = totalPages - 1;
+  const start = state.table.page * perPage;
+  const pageRows = rows.slice(start, start + perPage);
+
+  // Body
+  const bodyHtml = pageRows.map(r => {
+    const cells = cols.map(c => {
+      const raw = c.get(r, s);
+      const fmtted = c.fmt ? c.fmt(raw) : (raw ?? "—");
+      const classes = [
+        c.num ? "num" : "",
+        c.strong ? "strong" : "",
+        c.pg ? "pg" : "",
+        (c.num && (raw == null)) ? "muted" : "",
+      ].filter(Boolean).join(" ");
+      if (c.primary) {
+        return `<td class="${classes} strong">${escapeHtml(String(raw))}<div class="td-sub">${escapeHtml(c.sub ? c.sub(r, s) : "")}</div></td>`;
+      }
+      return `<td class="${classes}">${escapeHtml(String(fmtted))}</td>`;
+    }).join("");
+    return `<tr data-code="${r.x.c}" data-inst="${r.x.i}">${cells}</tr>`;
+  }).join("");
+
+  const body = document.getElementById("data-body");
+  if (!pageRows.length) {
+    body.innerHTML = `<tr><td class="data-empty" colspan="${cols.length}">Ingen treff.</td></tr>`;
+  } else {
+    body.innerHTML = bodyHtml;
+  }
+
+  // Count info + pagination below table
+  const countEl = document.getElementById("data-count");
+  if (countEl) countEl.textContent = rows.length.toLocaleString("nb-NO");
+
+  // Append pager under the table if we have more than one page
+  let pagerWrap = document.getElementById("data-pager");
+  if (!pagerWrap) {
+    pagerWrap = document.createElement("div");
+    pagerWrap.id = "data-pager";
+    pagerWrap.style.marginTop = "12px";
+    document.querySelector(".data-table-wrap").insertAdjacentElement("afterend", pagerWrap);
+  }
+  if (totalPages > 1) {
+    pagerWrap.innerHTML = `<div class="top-pager" style="border: 0; padding: 0; margin: 0;">${pagerHTML(state.table.page, totalPages, rows.length).replace(/^<div class="top-pager">|<\/div>$/g, "")}</div>`;
+    wirePager(pagerWrap, (dir) => {
+      state.table.page = (dir === Infinity) ? totalPages - 1 : (dir === -Infinity) ? 0 : clampPage(state.table.page + dir, totalPages);
+      renderDataTable();
+    });
+  } else {
+    pagerWrap.innerHTML = "";
+  }
+
+  // Header click → sort
+  document.querySelectorAll("#data-head th").forEach(th => {
+    th.addEventListener("click", () => {
+      const key = th.dataset.key;
+      if (state.table.sortKey === key) state.table.sortDir = -state.table.sortDir;
+      else { state.table.sortKey = key; state.table.sortDir = (cols.find(c => c.key === key).num ? -1 : 1); }
+      state.table.page = 0;
+      renderDataTable();
+    });
+  });
+  // Row click → drawer
+  document.querySelectorAll("#data-body tr[data-code]").forEach(tr => {
+    tr.addEventListener("click", () => openDrawer(findStudy(tr.dataset.code, +tr.dataset.inst)));
+  });
+
+  renderIcons();
+}
+
+function exportDataCsv() {
+  const s = state.data.sectors[state.sector];
+  const i = state.yearIdx;
+  const cols = tableColumns();
+  const q = state.table.search;
+
+  let rows = s.studies.map(x => ({ x, s: x.s[i], fv: x.fv[i], p: x.p[i], kv: x.kv[i] }));
+  if (q) {
+    rows = rows.filter(r => {
+      const hay = `${r.x.n} ${s.institutions[r.x.i]} ${s.locations[r.x.l]} ${s.fields[r.x.f]} ${r.x.c}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }
+  const { sortKey, sortDir } = state.table;
+  const col = cols.find(c => c.key === sortKey) || cols[0];
+  rows.sort((a, b) => {
+    const av = col.get(a, s); const bv = col.get(b, s);
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1; if (bv == null) return -1;
+    if (typeof av === "string") return sortDir * av.localeCompare(bv, "nb");
+    return sortDir * (av - bv);
+  });
+
+  const csvEscape = (v) => {
+    if (v == null) return "";
+    const s = String(v);
+    return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const header = cols.map(c => csvEscape(c.label)).join(";");
+  const lines = rows.map(r => cols.map(c => {
+    const raw = c.get(r, s);
+    if (c.num) return raw == null ? "" : String(raw).replace(".", ",");
+    return csvEscape(raw);
+  }).join(";"));
+  const csv = "﻿" + [header, ...lines].join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `sokertall-${state.sector}-${state.year}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  showToast("CSV lastet ned");
 }
 
 /* ---------- Toast ---------- */

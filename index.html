@@ -42,6 +42,7 @@
         <button class="tab" data-view="institutions" role="tab"><i data-lucide="landmark"></i><span>Institusjoner</span></button>
         <button class="tab" data-view="fields" role="tab"><i data-lucide="layers"></i><span>Fagområder</span></button>
         <button class="tab" data-view="poeng" role="tab"><i data-lucide="medal"></i><span>Poenggrenser</span></button>
+        <button class="tab" data-view="data" role="tab"><i data-lucide="table"></i><span>Data</span></button>
       </nav>
 
       <div class="topbar-actions">
@@ -363,6 +364,36 @@
         <div id="chart-fields-heat" class="chart chart-heat"></div>
       </section>
       <div id="field-cards" class="field-cards"></div>
+    </section>
+
+    <!-- DATA TABLE -->
+    <section id="view-data" class="view">
+      <div class="section-head data-head">
+        <div>
+          <h2>Rådatatabell</h2>
+          <p class="muted">Alle studieprogram i datasettet — klikk kolonneoverskrifter for å sortere.</p>
+        </div>
+        <div class="data-actions">
+          <div class="search-wrap data-search">
+            <i data-lucide="search"></i>
+            <input id="data-search" type="search" placeholder="Søk…" autocomplete="off" />
+          </div>
+          <button id="data-export" class="ghost-btn" title="Last ned synlige rader som CSV">
+            <i data-lucide="download"></i><span>CSV</span>
+          </button>
+        </div>
+      </div>
+      <div class="data-meta">
+        <span id="data-count">—</span> rader · referanseår <span id="data-year">—</span>
+      </div>
+      <div class="data-table-wrap">
+        <table class="data-table" id="data-table">
+          <thead>
+            <tr id="data-head"></tr>
+          </thead>
+          <tbody id="data-body"></tbody>
+        </table>
+      </div>
     </section>
   </main>
 
