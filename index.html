@@ -48,6 +48,9 @@
         <a class="ghost-btn" href="https://hkdir.no/sokertall-fra-samordna-opptak-til-nedlasting#Universitet%20og%20h%C3%B8gskoler" target="_blank" rel="noopener" title="HK-dir — søkertall">
           <i data-lucide="external-link"></i><span>Kilde</span>
         </a>
+        <a class="icon-btn" href="https://github.com/egil10/hkdir" target="_blank" rel="noopener" title="Kildekode på GitHub" aria-label="GitHub">
+          <i data-lucide="github"></i>
+        </a>
       </div>
     </div>
   </header>
@@ -391,9 +394,13 @@
 
   <footer class="footer">
     <div class="footer-inner">
-      <div>
-        <div class="foot-title">HK-dir Grunndata · Søkertall</div>
-        <div class="muted small">Data fra Samordna opptak publisert av Direktoratet for høyere utdanning og kompetanse. Visualisert for utforskning — ikke en offisiell HK-dir-tjeneste.</div>
+      <div class="foot-main">
+        <div class="foot-title">Søkertall · HK-dir Grunndata</div>
+        <p class="muted small">
+          Et uavhengig utforskningsverktøy for søkertall fra Samordna opptak til universitet, høgskole og fagskole.
+          Dashbordet er ikke tilknyttet eller godkjent av HK-dir eller Samordna opptak, og er ikke en offisiell tjeneste.
+          Offisielle tall finner du hos kildene under.
+        </p>
       </div>
       <div class="foot-links">
         <a href="https://hkdir.no/sokertall-fra-samordna-opptak-til-nedlasting#Universitet%20og%20h%C3%B8gskoler" target="_blank" rel="noopener" class="foot-link">
@@ -406,7 +413,43 @@
           <span>Samordna opptak — poenggrenser</span>
           <i data-lucide="external-link"></i>
         </a>
+        <a href="https://github.com/egil10/hkdir" target="_blank" rel="noopener" class="foot-link">
+          <i data-lucide="github"></i>
+          <span>Kildekode på GitHub</span>
+          <i data-lucide="external-link"></i>
+        </a>
       </div>
+    </div>
+
+    <div class="disclaimers">
+      <div class="disclaimer">
+        <div class="disc-head"><i data-lucide="info"></i>Om dataene</div>
+        <p>Søkertall er hentet fra HK-dirs grunndata for Samordna opptak og dekker 2021–2026. Poenggrenser
+          er hentet fra SO-datavarehus (Tableau) og dekker 2020–2025. Tallene er de sist publiserte — bruk
+          alltid den offisielle kilden dersom det er avvik.</p>
+      </div>
+      <div class="disclaimer">
+        <div class="disc-head"><i data-lucide="alert-triangle"></i>Sammenlignbarhet</div>
+        <p>Studiekoder kan endres mellom år når programmer slås sammen, splittes eller legges ned. Programmer med
+          opptaksprøve eller tilleggspoeng (f.eks. AHO, KHiO, NIH) har poenggrenser som ikke er direkte sammenlignbare
+          med ordinær poengberegning — de er derfor merket «særskilt opptak».</p>
+      </div>
+      <div class="disclaimer">
+        <div class="disc-head"><i data-lucide="graduation-cap"></i>Fagskoler</div>
+        <p>Søkertallene dekker både universiteter/høgskoler og fagskoler. Samordna opptak publiserer ikke
+          poenggrenser for fagskoler, så poenggrense-visningen er kun tilgjengelig for UH-sektoren.</p>
+      </div>
+      <div class="disclaimer">
+        <div class="disc-head"><i data-lucide="git-branch"></i>Kildekode og bidrag</div>
+        <p>Prosjektet er åpen kildekode og tilgjengelig på
+          <a href="https://github.com/egil10/hkdir" target="_blank" rel="noopener">github.com/egil10/hkdir</a>.
+          Feil eller forslag kan meldes som en issue der.</p>
+      </div>
+    </div>
+
+    <div class="foot-bottom">
+      <span class="muted small">Bygget med vanilla JS, ECharts og Lucide · Hostet på Vercel</span>
+      <span class="muted small">© <span id="foot-year">2026</span> · Fellesskapsprosjekt · Ikke tilknyttet HK-dir eller Samordna opptak</span>
     </div>
   </footer>
 

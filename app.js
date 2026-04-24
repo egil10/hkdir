@@ -72,6 +72,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  const footYear = document.getElementById("foot-year");
+  if (footYear) footYear.textContent = new Date().getFullYear();
+
   // Honour URL params: ?sector=uh|fag  and hash: #explore|#compare|…
   const params = new URLSearchParams(location.search);
   const sectorParam = params.get("sector");
