@@ -86,11 +86,18 @@ kbd {
   gap: 24px;
   min-height: var(--head-h);
 }
-.brand { display: flex; align-items: center; gap: 12px; }
-.brand-mark { height: 30px; width: auto; display: block; }
+.brand {
+  display: flex; align-items: center; gap: 10px;
+  text-decoration: none;
+  padding: 4px 8px 4px 4px;
+  border-radius: 12px;
+  transition: background 160ms ease;
+}
+.brand:hover { background: var(--bg-soft); }
+.brand-mark { height: 32px; width: 32px; display: block; border-radius: 8px; }
 .brand-text { line-height: 1.15; }
-.brand-title { font-family: "Fraunces", serif; font-weight: 700; color: var(--ink); font-size: 18px; }
-.brand-sub   { color: var(--muted); font-size: 12px; letter-spacing: 0.02em; text-transform: uppercase; }
+.brand-title { font-family: "Fraunces", serif; font-weight: 700; color: var(--ink); font-size: 19px; letter-spacing: -0.01em; }
+.brand-sub   { color: var(--muted); font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase; }
 
 .tabs {
   display: flex;
@@ -693,7 +700,7 @@ kbd {
 .drawer[aria-hidden="false"] .drawer-backdrop { opacity: 1; }
 .drawer-panel {
   position: absolute; right: 0; top: 0; bottom: 0;
-  width: min(640px, 100%);
+  width: min(860px, 100%);
   background: var(--panel);
   box-shadow: var(--shadow-lg);
   display: flex; flex-direction: column;
@@ -705,43 +712,47 @@ kbd {
 .drawer-head {
   position: sticky; top: 0;
   background: var(--panel);
-  padding: 22px 22px 16px;
+  padding: 28px 32px 18px;
   border-bottom: 1px solid var(--line);
   display: flex; justify-content: space-between; gap: 16px;
   z-index: 2;
 }
 .drawer-eyebrow { font-size: 12px; color: var(--primary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-.drawer-head h3 { margin: 4px 0 8px; }
-.drawer-meta { color: var(--muted); font-size: 12.5px; display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.drawer-meta i { width: 13px; height: 13px; }
+.drawer-head h3 { margin: 4px 0 10px; font-size: 26px; letter-spacing: -0.015em; }
+.drawer-meta { color: var(--muted); font-size: 13px; display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.drawer-meta i { width: 14px; height: 14px; }
 .drawer-kpis {
   display: grid; grid-template-columns: repeat(4, 1fr);
-  gap: 8px; padding: 16px 22px 0;
+  gap: 10px; padding: 18px 32px 0;
 }
 .d-kpi {
   background: var(--panel-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  padding: 10px 12px;
+  padding: 14px 16px;
 }
-.d-kpi .l { font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.04em; }
-.d-kpi .v { font-family: "Fraunces", serif; font-weight: 600; font-size: 18px; color: var(--ink); }
-.drawer-chart { padding: 16px 22px 0; height: 260px; }
+.d-kpi .l { font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.04em; margin-bottom: 3px; }
+.d-kpi .v { font-family: "Fraunces", serif; font-weight: 600; font-size: 22px; color: var(--ink); letter-spacing: -0.015em; }
+.drawer-chart { padding: 20px 32px 0; height: 320px; }
 #d-chart { height: 100%; }
-.drawer-actions { padding: 16px 22px; display: flex; gap: 10px; }
-.drawer-section { padding: 4px 22px 0; }
+.drawer-actions { padding: 18px 32px; display: flex; gap: 10px; }
+.drawer-section { padding: 10px 32px 0; }
 .drawer-section-head {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; margin-bottom: 6px;
+  gap: 12px; margin-bottom: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-2);
 }
 .drawer-section-head h4 {
-  margin: 0; font-family: "Fraunces", serif; font-weight: 600; font-size: 16px;
+  margin: 0; font-family: "Fraunces", serif; font-weight: 600; font-size: 18px;
   display: inline-flex; align-items: center; gap: 8px; color: var(--ink);
 }
-.drawer-section-head h4 i { width: 16px; height: 16px; color: var(--primary); }
-#d-pg-chart { height: 240px; }
+.drawer-section-head h4 i { width: 17px; height: 17px; color: var(--primary); }
+#d-pg-chart { height: 280px; }
 
-.drawer-table { padding: 0 22px 22px; }
+.drawer-table { padding: 12px 32px 32px; }
+.drawer-table table { font-size: 13.5px; }
+.drawer-table th, .drawer-table td { padding: 9px 10px; }
 .drawer-table table {
   width: 100%;
   border-collapse: collapse;

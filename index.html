@@ -3,8 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Søkertall · HK-dir Grunndata</title>
-  <meta name="description" content="Utforsk søkertall fra Samordna opptak til universiteter og høgskoler i Norge, 2021–2026." />
+  <title>Søkertall — utforsk norsk høyere utdanning</title>
+  <meta name="description" content="Søkertall, poenggrenser og trender fra Samordna opptak til universiteter, høgskoler og fagskoler i Norge, 2020–2026." />
+  <meta property="og:title" content="Søkertall" />
+  <meta property="og:description" content="Utforsk søkertall og poenggrenser fra Samordna opptak." />
+  <meta name="theme-color" content="#c4502b" />
 
   <link rel="preconnect" href="https://cdn.jsdelivr.net" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -15,20 +18,22 @@
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js" defer></script>
 
   <link rel="stylesheet" href="styles.css" />
-  <link rel="icon" type="image/png" href="assets/baeb68e1-87a6-4fe6-ab2b-a603ade0f355-w_300_h_100.png" />
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+  <link rel="mask-icon" href="assets/favicon.svg" color="#c4502b" />
+  <link rel="apple-touch-icon" href="assets/favicon.svg" />
 </head>
 <body>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <header class="topbar">
     <div class="topbar-inner">
-      <div class="brand">
-        <img src="assets/baeb68e1-87a6-4fe6-ab2b-a603ade0f355-w_300_h_100.png" alt="HK-dir" class="brand-mark" />
+      <a href="#overview" class="brand" id="brand-home" title="Tilbake til forsiden">
+        <img src="assets/logo.svg" alt="" class="brand-mark" />
         <div class="brand-text">
           <div class="brand-title">Søkertall</div>
-          <div class="brand-sub">Samordna opptak · 2021–2026</div>
+          <div class="brand-sub">Samordna opptak · 2020–2026</div>
         </div>
-      </div>
+      </a>
 
       <nav class="tabs" role="tablist" aria-label="Hovedvisning">
         <button class="tab active" data-view="overview" role="tab"><i data-lucide="gauge"></i><span>Oversikt</span></button>
