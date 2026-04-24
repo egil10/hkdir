@@ -1601,61 +1601,22 @@ function renderDataTable() {
     return sortDir * (av - bv);
   });
 
-  // --- HEADER: two rows (title + filter) ---
+  // Single-row sticky header — click to sort
   const head = document.getElementById("data-head");
-  const headHtml = cols.map(c => {
+  head.innerHTML = cols.map(c => {
     const active = c.key === sortKey;
     const arrow = active ? (sortDir === 1 ? "▲" : "▼") : "";
     const numCls = (c.type === "num" || c.type === "year") ? " num" : "";
-    return `<th data-key="${c.key}" class="col-head${numCls}${active ? " active" : ""}">
-      <button class="head-label" data-key="${c.key}">${escapeHtml(c.label)}<span class="sort-arrow">${arrow}</span></button>
-    </th>`;
+    return `<th data-key="${c.key}" class="${numCls}${active ? " active" : ""}">${escapeHtml(c.label)} <span class="sort-arrow">${arrow}</span></th>`;
   }).join("");
-
-  const filterHtml = cols.map(c => {
-    const val = cf[c.key] || "";
-    const placeholder = c.type === "num" ? "f.eks 50, >100, 20-40" : "filter";
-    if (c.type === "year") {
-      const opts = ["<option value=\"\">Alle år</option>"].concat(TABLE_YEARS.map(y =>
-        `<option value="${y}" ${val == y ? "selected" : ""}>${y}</option>`
-      )).join("");
-      return `<th class="col-filter num"><select data-filter="${c.key}">${opts}</select></th>`;
-    }
-    const numCls = c.type === "num" ? " num" : "";
-    return `<th class="col-filter${numCls}">
-      <input type="text" data-filter="${c.key}" placeholder="${placeholder}" value="${escapeHtml(val)}" />
-    </th>`;
-  }).join("");
-
-  head.innerHTML = `<tr class="r-head">${headHtml}</tr><tr class="r-filter">${filterHtml}</tr>`;
-
-  // Wire header clicks (sort) and filter inputs
-  head.querySelectorAll("button.head-label").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const key = btn.dataset.key;
+  head.querySelectorAll("th[data-key]").forEach(th => {
+    th.addEventListener("click", () => {
+      const key = th.dataset.key;
       if (state.table.sortKey === key) state.table.sortDir = -state.table.sortDir;
       else { state.table.sortKey = key; state.table.sortDir = (cols.find(c => c.key === key).type !== "text" ? -1 : 1); }
       state.table.page = 0;
       renderDataTable();
     });
-  });
-  head.querySelectorAll("[data-filter]").forEach(inp => {
-    const handler = debounce(() => {
-      const key = inp.dataset.filter;
-      cf[key] = inp.value;
-      state.table.page = 0;
-      renderDataTable();
-      // keep focus and caret in the same input
-      const again = document.querySelector(`#data-head [data-filter="${key}"]`);
-      if (again && inp !== again) {
-        again.focus();
-        if (again.setSelectionRange && again.value) {
-          again.setSelectionRange(again.value.length, again.value.length);
-        }
-      }
-    }, 180);
-    inp.addEventListener("input", handler);
-    inp.addEventListener("change", handler);
   });
 
   // Pagination

@@ -507,8 +507,7 @@ kbd {
   font-size: 13px;
   min-width: 1100px;
 }
-/* Header row 1: labels + sort */
-.data-table thead .r-head th {
+.data-table thead th {
   position: sticky; top: 0;
   background: var(--panel-2);
   color: var(--ink-2);
@@ -516,62 +515,21 @@ kbd {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding: 10px 10px 8px;
+  padding: 12px 10px;
   border-bottom: 1px solid var(--line);
   text-align: left;
+  cursor: pointer;
   user-select: none;
   white-space: nowrap;
-  z-index: 3;
-}
-.data-table thead .r-head th.num { text-align: right; }
-.data-table thead .r-head th.active { color: var(--ink); background: var(--bg-soft); }
-.data-table thead .r-head th .head-label {
-  appearance: none; border: 0; background: transparent;
-  color: inherit;
-  font: inherit; font-weight: 600;
-  text-transform: inherit;
-  letter-spacing: inherit;
-  padding: 0;
-  cursor: pointer;
-  display: inline-flex; align-items: center; gap: 4px;
-  width: 100%; justify-content: inherit;
-}
-.data-table thead .r-head th.num .head-label { justify-content: flex-end; }
-.data-table thead .r-head th .head-label:hover { color: var(--ink); }
-.data-table thead .r-head th .sort-arrow { color: var(--muted); font-size: 10px; }
-.data-table thead .r-head th.active .sort-arrow { color: var(--primary); }
-
-/* Header row 2: filter inputs */
-.data-table thead .r-filter th {
-  position: sticky; top: 34px;
-  background: var(--panel);
-  padding: 6px 6px 8px;
-  border-bottom: 1px solid var(--line);
+  transition: background 160ms ease;
   z-index: 2;
-  vertical-align: middle;
 }
-.data-table thead .r-filter input,
-.data-table thead .r-filter select {
-  width: 100%;
-  font: inherit; font-size: 12px;
-  padding: 5px 8px;
-  border: 1px solid var(--line);
-  background: var(--panel-2);
-  border-radius: 6px;
-  color: var(--ink);
-  outline: 0;
-  transition: border-color 140ms ease, background 140ms ease;
-}
-.data-table thead .r-filter input::placeholder { color: var(--muted); font-size: 11.5px; }
-.data-table thead .r-filter input:focus,
-.data-table thead .r-filter select:focus {
-  border-color: var(--ink);
-  background: var(--panel);
-}
-.data-table thead .r-filter th.num input { text-align: right; }
-
-/* Body */
-.data-table td.num, .data-table thead .r-head th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.data-table thead th:hover { background: var(--bg-soft); }
+.data-table thead th.num { text-align: right; }
+.data-table thead th .sort-arrow { color: var(--muted); margin-left: 4px; font-size: 10px; }
+.data-table thead th.active { color: var(--ink); background: var(--bg-soft); }
+.data-table thead th.active .sort-arrow { color: var(--primary); }
+.data-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .data-table tbody tr {
   border-bottom: 1px solid var(--line-2);
   cursor: pointer;
